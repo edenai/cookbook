@@ -52,4 +52,3 @@ pylint-report.txt
 Workflows/*
 !Workflows/*.yml
 
-assets/
