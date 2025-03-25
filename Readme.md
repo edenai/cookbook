@@ -1,6 +1,6 @@
 # 🧑‍🍳 Eden AI Cookbook 🍲
 
-![Banner](https://via.placeholder.com/800x200?text=Eden+AI+Cookbook+Banner)
+![Banner](https://www.google.com/url?sa=i&url=https%3A%2F%2Faws.amazon.com%2Fmarketplace%2Fpp%2Fprodview-iryqbzej3sxia&psig=AOvVaw1V7cWb2h6bT1xW2jDqfs49&ust=1743005295562000&source=images&cd=vfe&opi=89978449&ved=0CBQQjRxqFwoTCNir7O3OpYwDFQAAAAAdAAAAABAb)
 
 > A delightful collection of Python recipes using Eden AI services. Because cooking up AI solutions should be as easy (and fun) as following a recipe!
 
@@ -8,9 +8,6 @@
 - [✨ Overview](#-overview)
 - [🗂️ Project Structure](#%EF%B8%8F-project-structure)
 - [⚙️ Setup](#%EF%B8%8F-setup)
-- [🚀 Usage](#-usage)
-- [🤝 Contributing](#-contributing)
-- [📜 License](#-license)
 
 ## ✨ Overview
 
