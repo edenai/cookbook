@@ -1,7 +1,7 @@
 # 🧑‍🍳 Eden AI Cookbook 🍲
 
 <p align="center">
-<img src="https://edenai.co/static/images/eden-ai-logo.svg" alt="Eden AI Logo" width="200" style="max-width:100%;">
+<img src="assets/logo.jpg" alt="Eden AI Logo" width="200" style="max-width:100%; height:auto;">
 </p>
 
 > A delightful collection of Python recipes using Eden AI services. Because cooking up AI solutions should be as easy (and fun) as following a recipe!
