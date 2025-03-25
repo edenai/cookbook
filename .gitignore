@@ -51,3 +51,5 @@ pylint-report.txt
 # Ignore everything in Workflows except *.yml files
 Workflows/*
 !Workflows/*.yml
+
+assets/
