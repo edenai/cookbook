@@ -1,2 +1,53 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+env/
+venv/
+
+# VSCode settings
+.vscode/
+
+# Environment variables
 .env
-__pycache__
+
+# macOS and Linux system files
+.DS_Store
+Thumbs.db
+
+# Python-specific
+*.log
+*.pot
+*.pyc
+*.pyo
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Test & Coverage
+htmlcov/
+.coverage
+.tox/
+.nox/
+.pytest_cache/
+coverage.xml
+*.cover
+
+# MyPy
+.mypy_cache/
+
+# Pyre type checker
+.pyre/
+
+# Bandit security reports
+bandit.yaml
+
+# Pylint
+pylint-report.txt
+
+# Ignore everything in Workflows except *.yml files
+Workflows/*
+!Workflows/*.yml
