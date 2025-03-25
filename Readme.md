@@ -27,7 +27,7 @@ These code snippets serve as "recipes" to jumpstart your own AI projects. Simply
 ```
 EDENAI-COOKBOOK/
 ├── Document Parser/
-│   └── [ Scripts for parsing documents ]
+│   └── [ Resume parser, Financial Parser ]
 ├── Image/
 │   ├── fake_content_detection.py
 │   └── image_embeddings.py
@@ -36,7 +36,7 @@ EDENAI-COOKBOOK/
 ├── Text/
 │   └── text-embeddings.py
 ├── Workflows/
-│   └── [ End-to-end examples ]
+│   └── [ Webscraping+LLM ]
 ├── .env
 ├── .gitignore
 └── README.md
