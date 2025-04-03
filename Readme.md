@@ -27,7 +27,9 @@ These code snippets serve as "recipes" to jumpstart your own AI projects. Simply
 ```
 EDENAI-COOKBOOK/
 ├── Document Parser/
-│   └── [ Resume parser, Financial Parser ]
+│   └── [ financial-parser.py, resume-parser.py]
+├── EdenAI-OpenAI-Adapter/
+│   └── [ adapter.py, app.py ]
 ├── Image/
 │   ├── fake_content_detection.py
 │   └── image_embeddings.py
@@ -38,7 +40,7 @@ EDENAI-COOKBOOK/
 ├── Text/
 │   └── text-embeddings.py
 ├── Workflows/
-│   └── [ Webscraping+LLM ]
+│   └── [ OCR_LLM.py, webscraping_LLM.py ]
 ├── .env
 ├── .gitignore
 └── README.md
