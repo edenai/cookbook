@@ -20,6 +20,7 @@ EDENAI-COOKBOOK is a curated set of examples demonstrating how to leverage Eden 
 - 🖼️ **Image Analysis** - detect fake content, generate embeddings
 - 🎙️ **Speech** - text-to-speech, speech-to-text
 - 📝 **Text** - embeddings, sentiment analysis, summarization
+- 🧩 **Workflows** - Combination of various AI features built on the Eden AI's Workflows platform.
 
 These code snippets serve as "recipes" to jumpstart your own AI projects. Simply grab a script, tweak a few lines, and integrate advanced AI features into your workflow.
 
