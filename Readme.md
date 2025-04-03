@@ -16,6 +16,7 @@
 EDENAI-COOKBOOK is a curated set of examples demonstrating how to leverage Eden AI's powerful APIs for:
 
 - 📄 **Document Parsing** - extract info from PDFs, resumes, etc.
+- ⚙️ **EdenAI-OpenAI-Adapter** - shows openAI compatibility with Eden AI's API.
 - 🖼️ **Image Analysis** - detect fake content, generate embeddings
 - 🎙️ **Speech** - text-to-speech, speech-to-text
 - 📝 **Text** - embeddings, sentiment analysis, summarization
