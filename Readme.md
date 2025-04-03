@@ -1,4 +1,4 @@
-# 🧑‍🍳 Eden AI Cookbook 🍲
+# Eden AI Cookbook 🧑‍🍳
 
 <p align="center">
 <img src="assets/logo.jpg" alt="Eden AI Logo" width="200" style="max-width:100%; height:auto;">
