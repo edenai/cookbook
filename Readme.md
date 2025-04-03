@@ -31,6 +31,8 @@ EDENAI-COOKBOOK/
 ├── Image/
 │   ├── fake_content_detection.py
 │   └── image_embeddings.py
+├── RAG/
+│   └── rag.py
 ├── Speech/
 │   └── text-to-speech-async.py
 ├── Text/
