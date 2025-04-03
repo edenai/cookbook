@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional, Union
 import os
 from dotenv import load_dotenv
 import requests
+import json
 
 # Import our Eden AI adapter
 from adapter import EdenAI
@@ -44,30 +45,68 @@ class ChatRequest(BaseModel):
     messages: List[Message]
     temperature: Optional[float] = 0.7
     max_tokens: Optional[int] = None
+    top_p: Optional[float] = None
+    stream: Optional[bool] = False
+    stop: Optional[List[str]] = None
+    presence_penalty: Optional[float] = None
+    frequency_penalty: Optional[float] = None
 
 # Text and image chat endpoint
 @app.post("/chat/completions")
 async def chat_completions(
     request: ChatRequest,
-    client: EdenAI = Depends(get_client)
+    client = Depends(get_client)
 ):
     """
     Process a chat completion request using Eden AI with OpenAI SDK interface
     """
     try:
         # Convert Pydantic models to dictionaries
-        messages = [msg.dict() for msg in request.messages]
+        messages = []
+        for msg in request.messages:
+            messages.append({"role": msg.role, "content": msg.content})
+        
+        # Extract parameters that are not None
+        params = {}
+        for key, value in request.dict().items():
+            if key != "messages" and value is not None:
+                params[key] = value
         
         # Call Eden AI using OpenAI SDK interface
         response = client.chat.create(
-            model=request.model,
             messages=messages,
-            temperature=request.temperature,
-            max_tokens=request.max_tokens
+            **params
         )
         
-        # Return the full response
-        return JSONResponse(content=response)
+        # Convert the response to a dictionary for JSON serialization
+        response_dict = {
+            "id": response.id,
+            "object": response.object,
+            "created": response.created,
+            "model": response.model,
+            "choices": [
+                {
+                    "index": choice.index,
+                    "message": {
+                        "role": choice.message.role,
+                        "content": choice.message.content
+                    },
+                    "finish_reason": choice.finish_reason
+                }
+                for choice in response.choices
+            ],
+            "usage": {
+                "prompt_tokens": response.usage.prompt_tokens,
+                "completion_tokens": response.usage.completion_tokens,
+                "total_tokens": response.usage.total_tokens
+            }
+        }
+        
+        if hasattr(response, 'system_fingerprint') and response.system_fingerprint:
+            response_dict["system_fingerprint"] = response.system_fingerprint
+        
+        # Return the response as JSON
+        return JSONResponse(content=response_dict)
     
     except Exception as e:
         error_detail = str(e)

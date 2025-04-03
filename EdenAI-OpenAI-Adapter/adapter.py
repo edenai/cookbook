@@ -1,165 +1,292 @@
 import os
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional, Sequence, Mapping
 import requests
 import json
 
-class EdenAIOpenAIAdapter:
+# Import the actual OpenAI SDK
+from openai import OpenAI
+from openai.types import CompletionUsage
+from openai.types.chat import ChatCompletion, ChatCompletionMessage, ChatCompletionMessageParam
+from openai.types.chat.chat_completion import Choice
+
+class EdenAIClient(OpenAI):
     """
-    Adapter class that allows using Eden AI with the OpenAI SDK interface.
-    This provides a compatibility layer that maps OpenAI SDK calls to Eden AI API calls.
+    A client for Eden AI that extends the OpenAI client to provide compatibility
+    while routing requests to Eden AI instead.
     """
     
-    def __init__(self, api_key: str, base_url: str = None):
-        """
-        Initialize the adapter with Eden AI API key.
+    def __init__(
+        self,
+        *,
+        api_key: Optional[str] = None,
+        organization: Optional[str] = None,
+        base_url: str = "https://api.edenai.run/v2",
+        timeout: Optional[float] = None,
+        max_retries: int = 2,
+        **kwargs,
+    ):
+        # Initialize the OpenAI client with the given parameters
+        super().__init__(
+            api_key=api_key, 
+            organization=organization,
+            base_url=base_url,  # Use Eden AI base URL
+            timeout=timeout,
+            max_retries=max_retries,
+            **kwargs
+        )
         
-        Args:
-            api_key: Eden AI API key
-            base_url: Ignored, included for compatibility with OpenAI client
-        """
-        self.api_key = api_key
-        self.eden_api_url = "https://api.edenai.run/v2/llm/chat"
-        self.chat = self.ChatCompletions(self)
+        # Store the API key for use in requests
+        self.eden_api_key = api_key or os.environ.get("EDEN_AI_API_KEY")
+        if not self.eden_api_key:
+            raise ValueError("API key must be provided or set as EDEN_AI_API_KEY environment variable")
+        
+        # Define Eden AI specific endpoints
+        self.eden_chat_endpoint = f"{base_url}/llm/chat"
+        
+        # Override the chat completions function to use Eden AI
+        self.chat = EdenAIChatCompletions(self)
+
+class EdenAIChatCompletions:
+    """
+    Chat completions implementation for Eden AI that mimics the OpenAI SDK interface.
+    """
     
-    class ChatCompletions:
-        def __init__(self, parent):
-            self.parent = parent
-            self.completions = self  # For compatibility with client.chat.completions.create()
+    def __init__(self, client: EdenAIClient):
+        self.client = client
+    
+    def create(
+        self,
+        *,
+        messages: Sequence[Dict[str, Any]],
+        model: str,
+        frequency_penalty: Optional[float] = None,
+        logit_bias: Optional[Dict[str, int]] = None,
+        logprobs: Optional[bool] = None,
+        max_tokens: Optional[int] = None,
+        n: Optional[int] = None,
+        presence_penalty: Optional[float] = None,
+        response_format: Optional[Dict[str, str]] = None,
+        seed: Optional[int] = None,
+        stop: Optional[List[str]] = None,
+        stream: Optional[bool] = None,  # Eden AI doesn't support streaming, but added for compatibility
+        temperature: Optional[float] = None,
+        tool_choice: Optional[Dict[str, Any]] = None,
+        tool_definitions: Optional[Any] = None,
+        tools: Optional[Any] = None,
+        top_p: Optional[float] = None,
+        user: Optional[str] = None,
+        extra_headers: Optional[Dict[str, str]] = None,
+        extra_query: Optional[Dict[str, Any]] = None,
+        extra_body: Optional[Dict[str, Any]] = None,
+        timeout: Optional[float] = None,
+        **kwargs  # Handle any other extra parameters
+    ) -> ChatCompletion:
+        """
+        Create a chat completion using Eden AI.
         
-        def create(self, 
-                  model: str, 
-                  messages: List[Dict[str, Any]], 
-                  temperature: float = 0.7,
-                  max_tokens: Optional[int] = None,
-                  **kwargs) -> Dict[str, Any]:
-            """
-            Create a chat completion using Eden AI.
-            Maps OpenAI SDK interface to Eden AI API.
-            
-            Args:
-                model: Model name to use (should be in "provider/model" format for Eden AI)
-                messages: List of message dictionaries with "role" and "content"
-                temperature: Sampling temperature
-                max_tokens: Maximum number of tokens to generate
-                **kwargs: Additional arguments (ignored for compatibility)
-                
-            Returns:
-                Dict: OpenAI-compatible response object
-            """
-            # Prepare Eden AI request
-            # Convert messages to Eden AI format if needed
-            eden_messages = self._convert_messages_to_eden_format(messages)
-            
-            # Prepare the Eden AI payload
-            payload = {
-                "model": model,
-                "messages": eden_messages
-            }
-            
-            if temperature is not None:
-                payload["temperature"] = temperature
-                
-            if max_tokens is not None:
-                payload["max_tokens"] = max_tokens
-            
-            # Make the request to Eden AI
-            headers = {"Authorization": f"Bearer {self.parent.api_key}"}
-            response = requests.post(self.parent.eden_api_url, json=payload, headers=headers)
-            
-            if response.status_code != 200:
-                raise Exception(f"Eden AI API Error: {response.text}")
-            
-            # Get the raw response
-            eden_response = response.json()
-            
-            # NEW: Handle both response formats
-            # 1. If the response has provider-specific keys (older format)
-            # 2. If the response is directly in OpenAI format (newer format)
-            
-            # Check if this is the older format with provider-specific keys
-            if 'openai' in eden_response or 'anthropic' in eden_response or 'google' in eden_response:
-                # Extract provider name from model string (e.g., "openai/gpt-4o" -> "openai")
-                if '/' in model:
-                    provider = model.split('/')[0]
-                else:
-                    provider = "openai"  # Default to openai if no provider specified
-                
-                # Get provider-specific response
-                if provider in eden_response:
-                    provider_response = eden_response[provider]
-                    return provider_response
-                else:
-                    # Try to find any valid provider response
-                    for key in eden_response.keys():
-                        if key not in ["status", "error"] and isinstance(eden_response[key], dict):
-                            return eden_response[key]
-            
-            # If we reach here, it's likely the new format where Eden AI returns OpenAI format directly
-            return eden_response
+        Args match the OpenAI SDK's create method for compatibility.
+        """
+        # If streaming is requested, warn that it's not supported
+        if stream:
+            print("Warning: streaming is not supported by Eden AI and will be ignored")
         
-        def _convert_messages_to_eden_format(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-            """
-            Convert OpenAI-style messages to Eden AI format if needed.
+        # Convert OpenAI-style messages to Eden AI format
+        eden_messages = self._convert_messages_to_eden_format(messages)
+        
+        # Prepare the Eden AI request payload
+        payload = {
+            "model": model,
+            "messages": eden_messages
+        }
+        
+        # Add optional parameters if provided
+        if temperature is not None:
+            payload["temperature"] = temperature
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
+        if top_p is not None:
+            payload["top_p"] = top_p
+        if n is not None:
+            payload["n"] = n
+        if stop is not None:
+            payload["stop"] = stop
+        if presence_penalty is not None:
+            payload["presence_penalty"] = presence_penalty
+        if frequency_penalty is not None:
+            payload["frequency_penalty"] = frequency_penalty
+        
+        # Add any extra body parameters
+        if extra_body:
+            payload.update(extra_body)
+        
+        # Set up headers for Eden AI
+        headers = {
+            "Authorization": f"Bearer {self.client.eden_api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        # Add any extra headers
+        if extra_headers:
+            headers.update(extra_headers)
+        
+        # Make the request to Eden AI
+        response = requests.post(
+            self.client.eden_chat_endpoint,
+            json=payload,
+            headers=headers,
+            timeout=timeout
+        )
+        
+        # Check for errors
+        if response.status_code != 200:
+            raise Exception(f"Eden AI API Error: {response.text}")
+        
+        # Get the response
+        eden_response = response.json()
+        
+        # Process the response based on its format
+        processed_response = self._process_response(eden_response, model)
+        
+        # Return the response as a ChatCompletion object
+        return processed_response
+    
+    def _convert_messages_to_eden_format(self, messages: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Convert OpenAI-style messages to Eden AI format.
+        """
+        eden_messages = []
+        
+        for msg in messages:
+            # Convert message to dict if it's not already
+            if not isinstance(msg, dict):
+                # Handle SDK objects by converting to dict
+                if hasattr(msg, "model_dump"):
+                    msg = msg.model_dump()
+                else:
+                    # Fallback for other object types
+                    msg = {"role": msg.role, "content": msg.content}
             
-            Args:
-                messages: OpenAI-style messages
-                
-            Returns:
-                List of Eden AI compatible messages
-            """
-            eden_messages = []
+            # Handle system messages (Eden AI doesn't have system messages, convert to user)
+            if msg.get("role") == "system":
+                eden_messages.append({
+                    "role": "user",
+                    "content": [{"type": "text", "text": msg.get("content", "")}]
+                })
+                continue
             
-            for msg in messages:
-                # Handle system messages (Eden AI doesn't have system messages, convert to user)
-                if msg["role"] == "system":
-                    eden_messages.append({
-                        "role": "user",
-                        "content": [{"type": "text", "text": msg["content"]}]
-                    })
-                    continue
-                
-                # For regular content (string)
-                if isinstance(msg["content"], str):
-                    eden_messages.append({
-                        "role": msg["role"],
-                        "content": [{"type": "text", "text": msg["content"]}]
-                    })
-                # For array content (multimodal)
-                elif isinstance(msg["content"], list):
-                    content_list = []
-                    for item in msg["content"]:
+            # For regular content (string)
+            content = msg.get("content", "")
+            if isinstance(content, str):
+                eden_messages.append({
+                    "role": msg.get("role", "user"),
+                    "content": [{"type": "text", "text": content}]
+                })
+            # For array content (multimodal)
+            elif isinstance(content, list):
+                content_list = []
+                for item in content:
+                    if isinstance(item, dict):
                         if item.get("type") == "text":
-                            content_list.append({"type": "text", "text": item["text"]})
+                            content_list.append({"type": "text", "text": item.get("text", "")})
                         elif item.get("type") == "image_url":
                             content_list.append({
                                 "type": "image_url",
-                                "image_url": item["image_url"]
+                                "image_url": item.get("image_url", {})
                             })
-                    
-                    eden_messages.append({
-                        "role": msg["role"],
-                        "content": content_list
-                    })
-                else:
-                    eden_messages.append(msg)  # Already in correct format
+                
+                eden_messages.append({
+                    "role": msg.get("role", "user"),
+                    "content": content_list
+                })
+            else:
+                eden_messages.append(msg)  # Already in correct format
+        
+        return eden_messages
+    
+    def _process_response(self, eden_response: Dict[str, Any], model: str) -> ChatCompletion:
+        """
+        Process the Eden AI response, handling different response formats.
+        """
+        # Check if this is the older format with provider-specific keys
+        if 'openai' in eden_response or 'anthropic' in eden_response or 'google' in eden_response:
+            # Extract provider name from model string (e.g., "openai/gpt-4o" -> "openai")
+            if '/' in model:
+                provider = model.split('/')[0]
+            else:
+                provider = "openai"  # Default to openai if no provider specified
             
-            return eden_messages
+            # Get provider-specific response
+            if provider in eden_response:
+                provider_response = eden_response[provider]
+            else:
+                # Try to find any valid provider response
+                for key in eden_response.keys():
+                    if key not in ["status", "error"] and isinstance(eden_response[key], dict):
+                        provider_response = eden_response[key]
+                        break
+                else:
+                    raise Exception(f"No valid provider response found in Eden AI response: {eden_response}")
+            
+            # Convert to OpenAI format
+            return self._convert_to_chat_completion(provider_response, model)
+        
+        # If we reach here, it's likely the new format where Eden AI returns OpenAI format directly
+        return self._convert_to_chat_completion(eden_response, model)
+    
+    def _convert_to_chat_completion(self, response: Dict[str, Any], model: str) -> ChatCompletion:
+        """
+        Convert the response to a ChatCompletion object.
+        """
+        # Extract choices
+        choices = response.get("choices", [])
+        
+        # Create Choice objects
+        choice_objects = []
+        for i, choice in enumerate(choices):
+            message = choice.get("message", {})
+            choice_objects.append(
+                Choice(
+                    index=i,
+                    message=ChatCompletionMessage(
+                        role=message.get("role", "assistant"),
+                        content=message.get("content", ""),
+                        function_call=message.get("function_call"),
+                        tool_calls=message.get("tool_calls")
+                    ),
+                    finish_reason=choice.get("finish_reason", "stop"),
+                    logprobs=None
+                )
+            )
+        
+        # Extract usage
+        usage_data = response.get("usage", {})
+        usage = CompletionUsage(
+            prompt_tokens=usage_data.get("prompt_tokens", 0),
+            completion_tokens=usage_data.get("completion_tokens", 0),
+            total_tokens=usage_data.get("total_tokens", 0)
+        )
+        
+        # Create and return ChatCompletion object
+        return ChatCompletion(
+            id=response.get("id", "eden-ai-response"),
+            choices=choice_objects,
+            created=response.get("created", 0),
+            model=model,
+            object=response.get("object", "chat.completion"),
+            usage=usage,
+            system_fingerprint=response.get("system_fingerprint", None)
+        )
 
-# Create a function to initialize the client, making it similar to OpenAI client
-def EdenAI(api_key: str = None, base_url: str = None):
+# Function to create a client that mimics OpenAI's client creation pattern
+def EdenAI(api_key: Optional[str] = None, **kwargs) -> EdenAIClient:
     """
-    Create an Eden AI client with OpenAI SDK interface.
+    Create an Eden AI client using the OpenAI SDK interface.
     
     Args:
         api_key: Eden AI API key (defaults to EDEN_AI_API_KEY env var)
-        base_url: Ignored, included for compatibility with OpenAI client
+        **kwargs: Additional arguments to pass to the client
         
     Returns:
-        EdenAIOpenAIAdapter: Client with OpenAI SDK interface
+        EdenAIClient: Client with OpenAI SDK interface
     """
-    if api_key is None:
-        api_key = os.environ.get("EDEN_AI_API_KEY")
-        if not api_key:
-            raise ValueError("API key must be provided or set as EDEN_AI_API_KEY environment variable")
-    
-    return EdenAIOpenAIAdapter(api_key=api_key)
+    return EdenAIClient(api_key=api_key, **kwargs)
