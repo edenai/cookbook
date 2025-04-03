@@ -36,9 +36,9 @@ EDENAI-COOKBOOK/
 ├── RAG/
 │   └── rag.py
 ├── Speech/
-│   └── text-to-speech-async.py
+│   └── text_to_speech_async.py
 ├── Text/
-│   └── text-embeddings.py
+│   └── text_embeddings.py
 ├── Workflows/
 │   └── [ OCR_LLM.py, webscraping_LLM.py ]
 ├── .env
