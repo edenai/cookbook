@@ -28,12 +28,17 @@ These code snippets serve as "recipes" to jumpstart your own AI projects. Simply
 
 ```
 EDENAI-COOKBOOK/
+├── Custom Prompts/
+│   └── custom_prompts.py
 ├── Document Parser/
 │   └── [ financial-parser.py, resume-parser.py]
 ├── EdenAI-OpenAI-Adapter/
 │   └── [ adapter.py, app.py ]
+├── Generative/
+│   └── [ llm_chat_multimodal.py ]
 ├── Image/
-│   ├── fake_content_detection.py
+│   ├── background_removal.py
+|   ├── fake_content_detection.py
 │   └── image_embeddings.py
 ├── RAG/
 │   └── rag.py
