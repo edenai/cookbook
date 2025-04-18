@@ -37,9 +37,7 @@ EDENAI-COOKBOOK/
 ├── Generative/
 │   └── [ llm_chat_multimodal.py ]
 ├── Image/
-│   ├── background_removal.py
-|   ├── fake_content_detection.py
-│   └── image_embeddings.py
+│   ├── [ background_removal.py, fake_content_detection.py, image_embeddings.py ]
 ├── RAG/
 │   └── rag.py
 ├── Speech/
