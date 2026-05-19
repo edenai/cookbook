@@ -22,6 +22,25 @@ Tracks first-token latency and total response time per model. Add or remove mode
 
 **Default lineup:** Claude, GPT, DeepSeek, GLM. **Endpoint:** `/v3/llm/chat/completions` (OpenAI-compatible, with SSE streaming).
 
+## Coming soon
+
+Recipes on the to-do list — same self-contained, swap-in-one-line philosophy. PRs welcome.
+
+### 🔍 RAG over your PDFs
+Upload a document → OCR/extract → chunk and embed → semantic search → LLM answers with citations. Compares 3 embedding providers (OpenAI, Cohere, Mistral) side-by-side to show how retrieval quality changes with one config swap.
+
+**Endpoints:** `/v3/upload`, `/v3/ocr/async` (or equivalent), `/v3/llm/embeddings`, `/v3/llm/chat/completions`. **Pattern:** classic RAG, but every step is provider-swappable.
+
+### 🖼️ Vision Arena
+Upload an image → same question fired at 4 vision LLMs (GPT-4o, Claude Sonnet, Gemini, Pixtral) → compare descriptions + structured object detection side-by-side. Same arena UI as the LLM one, but with images as input and JSON-mode outputs for apples-to-apples comparison.
+
+**Endpoints:** `/v3/llm/chat/completions` with image content blocks. **Pattern:** arena, extended to multimodal.
+
+### 🌍 Real-time conversation translator
+Two-person live interpretation: person A speaks French → transcribed → translated → spoken in English to person B → person B replies in English → translated back to French. UN-interpreter style. Builds on the voice agent pipeline but with a translation step and a language-detection front-end.
+
+**Endpoints:** `/v3/universal-ai/async` (STT), `/v3/translation`, `/v3/universal-ai` (TTS). **Pattern:** bidirectional continuous pipeline.
+
 ## Prerequisites
 
 - Python 3.10+
@@ -34,11 +53,24 @@ Tracks first-token latency and total response time per model. Add or remove mode
 ```bash
 git clone <this-repo>
 cd edenai-cookbook
-export EDENAI_API_KEY="sk-..."   # or set in your shell rc
-jupyter lab
+
+# 1. Create a virtual environment + register it as a Jupyter kernel
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install ipykernel jupyterlab requests ipywebrtc ipywidgets python-dotenv aiohttp nest_asyncio
+.venv\Scripts\python.exe -m ipykernel install --user --name edenai-cookbook --display-name "Python (edenai-cookbook)"
+
+# 2. Drop your key in a .env file
+echo EDENAI_API_KEY="your-key-here" > .env
+
+# 3. Launch JupyterLab and pick the "Python (edenai-cookbook)" kernel
+.venv\Scripts\jupyter.exe lab
 ```
 
-Each notebook's first cell installs its own dependencies via `%pip install`, so there's no shared `requirements.txt` to track.
+> **Don't use the XPython kernel.** It treats `--quiet` as a package name and breaks `%pip install`. The kernel registered above is `ipykernel`, which works.
+
+The notebooks' first cell still runs `%pip install` as a safety net, but if you ran the setup above everything is already installed. The config cell calls `load_dotenv(override=True)`, so the `.env` file is the source of truth even if a stale `EDENAI_API_KEY` exists in your shell.
+
+> **Sandbox vs production keys.** Eden AI issues *sandbox* tokens (free, mocked responses — every model returns the same fake text) and *production* tokens (real provider calls, billed). The cookbook works with both, but the arena comparison and the voice pipeline only show real differences with a production key.
 
 ## Why these recipes
 
