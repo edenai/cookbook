@@ -91,7 +91,7 @@ One shared embedding space holding both images and text. Search a photo library 
 ## Setup
 
 ```bash
-git clone <this-repo>
+git clone https://github.com/edenai/cookbook
 cd edenai-cookbook
 
 # 1. Create a virtual environment + register it as a Jupyter kernel
