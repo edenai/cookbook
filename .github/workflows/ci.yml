@@ -1,0 +1,13 @@
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    # Placeholder CI for Bastion / SOC2 compliance.
+    # Repo owners: replace this with real lint/test/build steps for your stack.
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compliance placeholder
+        run: echo "ok"
