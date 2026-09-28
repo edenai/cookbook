@@ -2,7 +2,7 @@
 
 Voice agents make good demos, and they're painful to build. You need speech-to-text, an LLM that can call tools, a search API and text-to-speech. Those usually come from different vendors, each with its own SDK, key and bill, so most of the effort goes into the plumbing, not the idea.
 
-For this demo we put all of it behind Eden AI. The result is *Ask the web, out loud*. You speak a question, and the app transcribes it with **Gradium**. A **Nebius**-hosted LLM searches the web with **Tavily**, and Gradium reads the cited answer back. The backend is 166 lines of Python, the UI is one HTML file, and there's one environment variable: `EDENAI_API_KEY`.
+For this demo we put all of it behind Eden AI. The result is *Ask the web, out loud*. You speak a question, and the app transcribes it with **Gradium**. A **Nebius**-hosted LLM searches the web with **Tavily**, and Gradium reads the cited answer back. The backend is about 200 lines of Python, the UI is one HTML file, and there's one environment variable: `EDENAI_API_KEY`.
 
 ## How it works
 
@@ -38,6 +38,15 @@ These are the lessons worth taking away, because each one is a real way a live d
 - **Echo tool calls back minimally.** When the assistant's tool call goes back into the conversation, keep only `id`, `type` and `function`, and use `""` rather than `null` for content. Strict providers reject extra fields, such as the `index` a gateway can add.
 - **Degrade, don't crash.** If text-to-speech fails, the answer still appears on screen, with a warning. A typed question and a pre-recorded sample always work, because venue audio never does.
 
+## What only real calls caught
+
+A mock of the API passed every test. The first real run failed in four places, and each was a one- or two-line fix:
+
+- **Gradium's text-to-speech has no MP3 output.** It offers WAV, Opus or PCM, so the app asks Gradium for WAV and other voices for MP3.
+- **Gradium streams its WAV** with "unknown length" in the header, which browser audio players can choke on. The backend writes the real lengths in before handing the audio to the page.
+- **Browser recordings are WebM**, which gets detected as *video* on upload and refused by speech-to-text. Sending the browser's own `audio/webm` type fixes it.
+- **The LLM fired ten searches for one question**, and the run took nearly 60 seconds. The app now allows two searches, puts today's date in the prompt so they target this week's news, and shows the text before the audio is ready. The answer is on screen in about 5 seconds.
+
 ## Check the catalog at startup
 
 Our first brief for this demo had three wrong details: a model ID missing its version suffix, an LLM endpoint path that doesn't exist, and the wrong name for the async job ID field. Each would have failed on the first call. Model names change faster than documentation. So at startup the app checks every model string against Eden AI's public catalog (`GET /v3/info/{feature}/{subfeature}` and `GET /v3/models`, no key needed). It prints the ones it will use and drops any that have disappeared.
@@ -46,7 +55,7 @@ The same check gives EU data residency for free. Point `EDENAI_BASE_URL` at `api
 
 ## What it costs
 
-At current catalog prices, one question costs about **five cents**. Most of that is text-to-speech on a 120-word answer (about $0.04), then web search (about $0.008). Transcription and two LLM turns cost well under a cent. Nobody has to estimate it, because every run prints its exact cost in the Stack panel.
+Measured with real calls, one question costs about **four cents**. Most of that is Gradium text-to-speech on an 80-word answer (about $0.03), then one Tavily search ($0.008). Transcription and two LLM turns cost well under a cent. Nobody has to estimate it, because every run prints its exact cost in the Stack panel.
 
 ## Try it
 
