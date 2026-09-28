@@ -38,7 +38,7 @@ python scripts/upstream_watch.py --manifest example/requirements.txt
 ## Stage runbook (about 90 s)
 
 1. Show the fork: `requirements.txt` with old pins and a green CI badge.
-2. **Actions → Upstream Watch → Run workflow.** While it runs (30–60 s), show the Eden AI dashboard filling with `web/search/tavily` and `nebius/…` calls, tagged `repo=<owner>/<repo>`.
+2. **Actions → Upstream Watch → Run workflow.** While it runs (about 30 s plus runner start-up), show the Eden AI dashboard filling with `web/search/tavily` and `nebius/…` calls, tagged `repo=<owner>/<repo>`.
 3. The run page shows a verdict table, and PRs appear with a title, a one-line summary, cited sources and the run cost.
 4. CI goes green on the PR.
 5. Close with: *"Nobody asked for this PR. The web told the repo it was out of date. One key, one bill, and still a human on merge."*
@@ -53,7 +53,7 @@ As a fallback, pre-record a 60-second capture of steps 2–4.
 | At most 3 PRs per run | `--max-prs 3`. Security first, then patches; the rest wait for the next run |
 | Allowlist | `--allow flask,gunicorn`. Other packages get an issue, not a PR |
 | Breaking never edits code | A new major version always becomes an issue, even if the model called it a patch |
-| Hard cost cap | `--max-cost 0.10`. Stops calling Eden AI once the run's summed `cost` reaches the cap |
+| Hard cost cap | `--max-cost 0.10`. Packages are checked 4 at a time, and the summed `cost` is checked between batches. Once it reaches the cap, the rest wait for the next run and issues skip the LLM draft |
 | Search results are data | The prompt says so. A proposed version must be newer than the pin **and** appear in the search results, and cited URLs must come from the results, or the verdict is dropped |
 | No duplicates | A PR or issue title seen before, open or closed, is never opened again |
 | Loud failures | If a package can't be checked (e.g. a bad key), the run goes red instead of silently green |
@@ -68,9 +68,23 @@ As a fallback, pre-record a 60-second capture of steps 2–4.
 
 Every call is tagged `repo=<owner>/<repo>` for per-repo cost in the Eden AI dashboard. Model strings were checked against the live catalog (`/v3/models`, `/v3/info/web/search`) on 2026-09-28.
 
-## Cost
+## Cost, timing and a real run
 
-Each package costs one search (about $0.008 with Tavily) plus one small LLM call (well under $0.001). Each breaking issue adds one LLM call. The 7 packages in `example/requirements.txt` come to about **$0.06 per run**. Identical searches repeated inside the response-cache window are free. The exact figure is in every PR and issue body and on the run page.
+Each package costs one search (about $0.008 with Tavily) plus one small LLM call (well under $0.001). Each breaking issue adds one LLM call. Packages are checked 4 at a time.
+
+Measured with real calls on 2026-09-28 against the 7 flaskr-tdd pins: **about 30 s and $0.06 per run.**
+
+| Package | Pinned | Found | Verdict | What happens |
+|---|---|---|---|---|
+| Flask | 3.0.0 | 3.1.3 | security (CVE-2026-27205) | PR |
+| Flask-SQLAlchemy | 3.1.1 | 3.1.2 | patch | PR |
+| psycopg2-binary | 2.9.9 | 2.9.13 | patch | PR |
+| gunicorn | 21.2.0 | 26.2.0 | breaking (major, also fixes request-smuggling CVEs) | issue |
+| flake8 | 6.1.0 | 7.4.1 | breaking (major) | issue |
+| pytest | 7.4.2 | 9.0.2 | breaking (major, also CVE-2025-71176) | issue, which names `tests/` files that import pytest |
+| black | 23.10.0 | none found | none | nothing |
+
+Results depend on what the web says on the day, so check the verdicts before a live demo. For example, black 25.x exists, but that day's search results didn't mention it, so the model correctly reported nothing newer. The exact cost is in every PR and issue body and on the run page.
 
 ## Limits (v1)
 

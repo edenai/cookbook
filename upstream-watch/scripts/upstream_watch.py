@@ -12,6 +12,7 @@ import os
 import re
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from packaging.version import InvalidVersion, Version
@@ -19,6 +20,7 @@ from packaging.version import InvalidVersion, Version
 import edenai
 
 MODEL, FALLBACKS = "nebius/Qwen/Qwen3-235B-A22B-Instruct-2507", ["nebius/openai/gpt-oss-120b"]
+PARALLEL = 4  # packages checked at once (well under the 10 req/s account limit)
 PRIORITY = {"security": 0, "patch": 1, "breaking": 2, "none": 3}  # security PRs go first
 VERDICT = {"type": "object", "additionalProperties": False,
            "required": ["package", "pinned", "latest", "kind", "summary", "sources"],
@@ -34,7 +36,9 @@ Set "latest" to the newest stable version the results mention (the pinned versio
 - "patch": any other newer release
 "summary" is one sentence. "sources" lists only URLs from the results that support the verdict."""
 DRAFT = """Write a GitHub issue body in markdown, at most 150 words: what changed upstream, which files in this repo
-are affected, and a suggested migration order. Cite sources as [1], [2] using only the URLs given; never invent URLs."""
+are affected, and a suggested migration order. State only facts found in "evidence"; if a detail is not there, leave it
+out. List "affected_files" exactly as given (if empty, say no direct imports were found) and never guess other files.
+Cite sources as [1], [2] using only the URLs in "sources"; never invent URLs."""
 
 
 def read_pins(manifest: Path) -> dict[str, str]:
@@ -68,10 +72,20 @@ def triage(name: str, pinned: str) -> tuple[dict, float]:
     return check(verdict, name, pinned, results), cost
 
 
+def safe_triage(pin: tuple[str, str]) -> tuple[dict, float, bool]:
+    """One failing package must not stop the others (but the run still fails at the end)."""
+    name, pinned = pin
+    try:
+        return (*triage(name, pinned), False)
+    except Exception as e:
+        return {"package": name, "pinned": pinned, "latest": pinned, "kind": "none", "summary": f"Skipped: {e}", "sources": []}, 0.0, True
+
+
 def check(v: dict, name: str, pinned: str, results: list) -> dict:
     """Don't trust the model blindly: the new version must be newer and must appear in the search results."""
     urls, text = {r["url"] for r in results}, json.dumps(results)
-    v = {**v, "package": name, "pinned": pinned, "sources": [u for u in v.get("sources", []) if u in urls]}
+    v = {**v, "package": name, "pinned": pinned, "sources": [u for u in v.get("sources", []) if u in urls],
+         "evidence": [r for r in results if r["url"] in v.get("sources", [])] or results}  # grounds the issue draft
     try:
         newer = Version(v["latest"]) > Version(pinned)
     except InvalidVersion:
@@ -133,20 +147,18 @@ def main() -> None:
     ap.add_argument("--max-cost", type=float, default=0.10, help="stop calling Eden AI once the run has cost this (USD)")
     args = ap.parse_args()
 
-    # 1-2. Signal and triage, one package at a time, under a hard cost cap
+    # 1-2. Signal and triage, PARALLEL packages at a time, under a hard cost cap checked between batches
     verdicts, cost, errors = [], 0.0, 0
-    for name, pinned in read_pins(args.manifest).items():
-        if cost >= args.max_cost:
-            print(f"Cost cap ${args.max_cost:g} reached: remaining packages wait for the next run.")
-            break
-        try:
-            v, c = triage(name, pinned)
-        except Exception as e:  # one failing package must not stop the others, but the run fails at the end
-            v, c = {"package": name, "pinned": pinned, "latest": pinned, "kind": "none", "summary": f"Skipped: {e}", "sources": []}, 0.0
-            errors += 1
-        cost += c
-        verdicts.append(v)
-        print(f"{name:<22} {pinned:>9} -> {v['latest']:<9} {v['kind']:<9} {v['summary']}")
+    pins = list(read_pins(args.manifest).items())
+    with ThreadPoolExecutor(PARALLEL) as pool:
+        for i in range(0, len(pins), PARALLEL):
+            if cost >= args.max_cost:
+                print(f"Cost cap ${args.max_cost:g} reached: remaining packages wait for the next run.")
+                break
+            for v, c, failed in pool.map(safe_triage, pins[i:i + PARALLEL]):
+                cost, errors = cost + c, errors + failed
+                verdicts.append(v)
+                print(f"{v['package']:<22} {v['pinned']:>9} -> {v['latest']:<9} {v['kind']:<9} {v['summary']}")
 
     # 3. Decide: security first, then patches, at most --max-prs; breaking or non-allowlisted -> issue
     allow = {a.strip().lower() for a in args.allow.split(",") if a.strip()}
@@ -154,10 +166,17 @@ def main() -> None:
     bumpable = [v for v in todo if v["kind"] != "breaking" and (not allow or v["package"].lower() in allow)]
     prs, later = bumpable[:args.max_prs], bumpable[args.max_prs:]
     issues = [v for v in todo if v not in bumpable]
-    bodies = {}
-    for v in issues:
-        body, c = draft_issue(v) if v["kind"] == "breaking" else (cited(v) + "\n\nNot on the allowlist, so no PR was opened.", 0.0)
-        bodies[v["package"]], cost = body, cost + c
+    under_cap = cost < args.max_cost  # past the cap, issues get the plain cited body instead of an LLM migration plan
+
+    def body_for(v):
+        if v["kind"] == "breaking" and under_cap:
+            return draft_issue(v)
+        return cited(v) + ("\n\nNot on the allowlist, so no PR was opened." if v["kind"] != "breaking" else ""), 0.0
+
+    with ThreadPoolExecutor(PARALLEL) as pool:  # issue drafts run in parallel too
+        drafted = list(pool.map(body_for, issues))
+    bodies = {v["package"]: body for v, (body, _) in zip(issues, drafted)}
+    cost += sum(c for _, c in drafted)
     footer = f"\n\n---\n_Opened by Upstream Watch · Tavily + Nebius via Eden AI · this run cost ${cost:.4f}_"
 
     # 4. Execute (or print, in a dry run). Titles seen before are skipped, so daily runs don't duplicate.
