@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ask the web, out loud</title>
+<style>
+  :root { --bg: #0b0d12; --panel: #151923; --text: #f2f4f8; --muted: #8b93a7; --accent: #6ee7b7; --rec: #f87171; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 20px/1.5 system-ui, sans-serif; }
+  main { display: grid; grid-template-columns: 1fr 440px; gap: 32px; max-width: 1400px; margin: auto; padding: 32px; }
+  @media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
+  h1 { margin: 0; font-size: 44px; } .sub { color: var(--muted); margin: 4px 0 28px; }
+  #mic { width: 150px; height: 150px; border-radius: 50%; border: 0; background: var(--accent); font-size: 56px; cursor: pointer; }
+  #mic.rec { background: var(--rec); animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { transform: scale(1.08); } }
+  .row { display: flex; gap: 12px; margin: 24px 0; flex-wrap: wrap; }
+  input, select, button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid #2a3040; border-radius: 10px; padding: 10px 14px; }
+  input { flex: 1; min-width: 240px; } button { cursor: pointer; }
+  #status { color: var(--accent); min-height: 30px; }
+  #transcript { color: var(--muted); font-style: italic; }
+  #answer { font-size: 30px; line-height: 1.4; white-space: pre-wrap; }
+  .sources a { display: block; background: var(--panel); border-radius: 10px; padding: 10px 14px; margin: 8px 0; color: var(--text); text-decoration: none; }
+  .sources small { color: var(--muted); }
+  aside { background: var(--panel); border-radius: 16px; padding: 24px; align-self: start; }
+  aside label { display: block; color: var(--muted); font-size: 16px; margin-top: 12px; } aside select { width: 100%; }
+  table { width: 100%; border-collapse: collapse; font-size: 16px; margin-top: 20px; }
+  td { padding: 8px 4px; border-top: 1px solid #2a3040; vertical-align: top; } td code { color: var(--muted); font-size: 13px; word-break: break-all; }
+  .num { text-align: right; white-space: nowrap; } tfoot td { font-weight: bold; color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <section>
+    <h1>Ask the web, out loud</h1>
+    <div class="sub">Gradium · Nebius · Tavily — one API key via Eden AI</div>
+    <button id="mic" title="Click to record, click again to ask">🎙️</button>
+    <div class="row">
+      <input id="q" placeholder="…or type a question" onkeydown="if (event.key === 'Enter') ask()">
+      <button onclick="ask()">Ask</button>
+      <button onclick="useSample()">Use sample</button>
+    </div>
+    <div id="status"></div>
+    <p id="transcript"></p>
+    <div id="answer"></div>
+    <audio id="player" controls hidden></audio>
+    <div class="sources" id="sources"></div>
+  </section>
+  <aside>
+    <h2 style="margin:0">Stack</h2>
+    <label>Web search <select id="search"></select></label>
+    <label>Text to speech <select id="tts"></select></label>
+    <label>LLM <select id="llm"></select></label>
+    <table><tbody id="steps"></tbody><tfoot id="total"></tfoot></table>
+  </aside>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const status = (text) => ($("status").textContent = text);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+fetch("/api/providers").then((r) => r.json()).then((choices) => {
+  for (const [kind, models] of Object.entries(choices))
+    $(kind).innerHTML = models.map((m) => `<option>${m}</option>`).join("");
+});
+
+let recorder;
+$("mic").onclick = async () => {
+  if (recorder?.state === "recording") return recorder.stop();
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const chunks = [];
+  recorder = new MediaRecorder(stream);
+  recorder.ondataavailable = (e) => chunks.push(e.data);
+  recorder.onstop = () => {
+    stream.getTracks().forEach((t) => t.stop());
+    $("mic").classList.remove("rec");
+    ask(new Blob(chunks, { type: recorder.mimeType }), "question.webm");
+  };
+  recorder.start();
+  $("mic").classList.add("rec");
+  status("Listening… click again to ask");
+};
+
+async function useSample() {
+  const r = await fetch("/samples/question.mp3");
+  if (!r.ok) return status("No sample yet: run  python make_sample.py");
+  ask(await r.blob(), "question.mp3");
+}
+
+async function ask(audio, filename) {
+  const form = new FormData();
+  if (audio) form.append("audio", audio, filename);
+  else if ($("q").value.trim()) form.append("text", $("q").value);
+  else return status("Say or type a question first");
+  for (const kind of ["search", "tts", "llm"]) form.append(kind, $(kind).value);
+
+  status("Thinking…");
+  $("answer").textContent = $("transcript").textContent = $("sources").innerHTML = "";
+  $("player").hidden = true;
+  const r = await fetch("/api/ask", { method: "POST", body: form });
+  const data = await r.json();
+  showSteps(data.steps || []);
+  if (!r.ok) return status(`⚠️ ${data.step} failed: ${data.error}`);
+
+  status(data.warning ? `⚠️ ${data.warning}` : "");
+  $("transcript").textContent = `“${data.transcript}”`;
+  $("answer").textContent = data.answer.split("Sources:")[0].trim();
+  $("sources").innerHTML = data.sources.map((s) =>
+    `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}<br><small>${new URL(s.url).hostname}</small></a>`).join("");
+  if (!data.audio_url) return;
+  $("player").src = data.audio_url;
+  $("player").hidden = false;
+  $("player").play();
+}
+
+function showSteps(steps) {
+  $("steps").innerHTML = steps.map((s) => `<tr><td>${s.name}<br><code>${esc(s.provider || "")} · ${s.model}</code></td>
+    <td class="num">${s.ms} ms</td><td class="num">$${s.cost.toFixed(5)}</td></tr>`).join("");
+  const total = steps.reduce((sum, s) => sum + s.cost, 0);
+  $("total").innerHTML = steps.length ? `<tr><td>Total</td><td></td><td class="num">$${total.toFixed(5)}</td></tr>` : "";
+}
+</script>
+</body>
+</html>
