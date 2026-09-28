@@ -1,0 +1,34 @@
+# Copy into your repo as .github/workflows/upstream-watch.yml (with scripts/upstream_watch.py and scripts/edenai.py).
+name: Upstream Watch
+
+on:
+  schedule:
+    - cron: "0 7 * * *"   # daily, 07:00 UTC
+  workflow_dispatch:       # the "Run workflow" button, for the stage demo
+
+permissions:
+  contents: write          # push the bump branch
+  pull-requests: write     # open the PR
+  issues: write            # open the breaking-change issue
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      # A PR opened with the default GITHUB_TOKEN does not trigger your CI. Add a fine-grained token
+      # (contents, pull requests, issues: read/write) as the UPSTREAM_WATCH_TOKEN secret so CI runs on the PR.
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.UPSTREAM_WATCH_TOKEN || github.token }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install httpx packaging
+      - name: Upstream Watch
+        env:
+          EDENAI_API_KEY: ${{ secrets.EDENAI_API_KEY }}
+          GH_TOKEN: ${{ secrets.UPSTREAM_WATCH_TOKEN || github.token }}
+        run: |
+          git config user.name "upstream-watch[bot]"
+          git config user.email "upstream-watch@users.noreply.github.com"
+          python scripts/upstream_watch.py --manifest requirements.txt --apply --max-prs 3 --max-cost 0.10
