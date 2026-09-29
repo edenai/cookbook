@@ -22,8 +22,8 @@ async def call(method, path, **kwargs):
     return body
 
 
-async def upload(data: bytes, filename: str) -> dict:
-    return await call("POST", "/upload", files={"file": (filename, data)}, data={"expires_in_days": "1"})
+async def upload(data: bytes, filename: str, content_type: str) -> dict:
+    return await call("POST", "/upload", files={"file": (filename, data, content_type)}, data={"expires_in_days": "1"})
 
 
 async def transcribe(file_id: str, model: str) -> dict:
@@ -47,7 +47,13 @@ async def chat(messages: list, tools: list, model: str, fallbacks: list[str], to
 
 
 async def speak(text: str, model: str) -> dict:
-    return await call("POST", "/universal-ai", json={"model": model, "input": {"text": text, "audio_format": "mp3"}})
+    audio_format = "wav" if model.startswith("audio/tts/gradium") else "mp3"  # Gradium has no mp3
+    return await call("POST", "/universal-ai", json={"model": model, "input": {"text": text, "audio_format": audio_format}})
+
+
+async def download(url: str) -> bytes:
+    async with httpx.AsyncClient(timeout=30) as plain:  # no Authorization header: this is a CDN link
+        return (await plain.get(url)).content
 
 
 def in_catalog(model: str) -> bool:

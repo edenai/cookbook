@@ -82,35 +82,48 @@ $("mic").onclick = async () => {
 };
 
 async function useSample() {
-  const r = await fetch("/samples/question.mp3");
+  const r = await fetch("/samples/question.wav");
   if (!r.ok) return status("No sample yet: run  python make_sample.py");
-  ask(await r.blob(), "question.mp3");
+  ask(await r.blob(), "question.wav");
 }
 
+async function post(url, form) {
+  const r = await fetch(url, { method: "POST", body: form });
+  return { ok: r.ok, data: await r.json() };
+}
+
+let steps = [];
 async function ask(audio, filename) {
   const form = new FormData();
   if (audio) form.append("audio", audio, filename);
   else if ($("q").value.trim()) form.append("text", $("q").value);
   else return status("Say or type a question first");
-  for (const kind of ["search", "tts", "llm"]) form.append(kind, $(kind).value);
+  form.append("search", $("search").value);
+  form.append("llm", $("llm").value);
 
   status("Thinking…");
   $("answer").textContent = $("transcript").textContent = $("sources").innerHTML = "";
   $("player").hidden = true;
-  const r = await fetch("/api/ask", { method: "POST", body: form });
-  const data = await r.json();
-  showSteps(data.steps || []);
-  if (!r.ok) return status(`⚠️ ${data.step} failed: ${data.error}`);
+  const { ok, data } = await post("/api/ask", form);
+  showSteps((steps = data.steps || []));
+  if (!ok) return status(`⚠️ ${data.step} failed: ${data.error}`);
 
-  status(data.warning ? `⚠️ ${data.warning}` : "");
   $("transcript").textContent = `“${data.transcript}”`;
-  $("answer").textContent = data.answer.split("Sources:")[0].trim();
+  $("answer").textContent = data.spoken;
   $("sources").innerHTML = data.sources.map((s) =>
     `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}<br><small>${new URL(s.url).hostname}</small></a>`).join("");
-  if (!data.audio_url) return;
-  $("player").src = data.audio_url;
+
+  status("Speaking…");  // the answer is already on screen while the audio is made
+  const speech = new FormData();
+  speech.append("text", data.spoken);
+  speech.append("tts", $("tts").value);
+  const spoken = await post("/api/speak", speech);
+  showSteps((steps = steps.concat(spoken.data.steps || [])));
+  if (!spoken.ok) return status(`⚠️ text-to-speech failed: ${spoken.data.error}`);
+  status("");
+  $("player").src = spoken.data.audio_url;
   $("player").hidden = false;
-  $("player").play();
+  $("player").play().catch(() => status("Press ▶ to hear the answer"));  // if the browser blocks autoplay
 }
 
 function showSteps(steps) {

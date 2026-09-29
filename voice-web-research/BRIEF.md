@@ -44,7 +44,7 @@ Every response includes a `cost`, which the Stack panel should show. All model s
 - The Stack panel, always visible.
 - Three dropdowns to swap providers live, with no reload:
   - **Search:** tavily, linkup, firecrawl.
-  - **TTS:** gradium, elevenlabs, openai/tts-1.
+  - **TTS:** gradium, elevenlabs, deepgram/aura-2.
   - **LLM:** the two Nebius models, or `mistral/mistral-large-latest`.
 - A dark, high-contrast theme that's readable on a projector.
 
