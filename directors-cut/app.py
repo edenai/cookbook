@@ -1,4 +1,4 @@
-"""Web view for Director's Cut: describe a film, watch Claude write the shot list and PixVerse shoot it, then reshoot."""
+"""Web view for Director's Cut: describe a film, watch the director plan it, Gemini draw it and PixVerse shoot it, then reshoot."""
 import asyncio
 import json
 import shutil
@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 import edenai
-from director import DIRECTORS, MODELS, MULTI_SHOT, SIZES, make_film, reshoot
+from director import ARTIST, DIRECTORS, MODELS, MULTI_SHOT, SIZES, make_film, reshoot
 
 OUT = Path("out")
 OUT.mkdir(exist_ok=True)
@@ -29,7 +29,7 @@ def index():
 
 @app.get("/api/options")
 def options():
-    return {"models": MODELS, "multishot": sorted(MULTI_SHOT), "aspects": list(SIZES),
+    return {"models": MODELS, "multishot": sorted(MULTI_SHOT), "aspects": list(SIZES), "artist": ARTIST,
             "directors": [{"id": k, "label": v[0], "group": v[1]} for k, v in DIRECTORS.items()]}
 
 
@@ -57,15 +57,15 @@ def stream(job) -> StreamingResponse:
 
 @app.post("/api/film")
 async def film(premise: str = Form(...), model: str = Form(...), aspect: str = Form("16:9"), shots: int = Form(4),
-               mode: str = Form("shots"), director: str = Form("anthropic/claude-sonnet-latest")):
+               mode: str = Form("storyboard"), director: str = Form("anthropic/claude-sonnet-latest")):
     if (not premise.strip() or model not in MODELS or aspect not in SIZES or director not in DIRECTORS
-            or mode not in ("shots", "chain", "multishot") or not 2 <= shots <= 6 or (mode == "multishot" and model not in MULTI_SHOT)):
+            or mode not in ("storyboard", "multishot") or not 2 <= shots <= 6 or (mode == "multishot" and model not in MULTI_SHOT)):
         raise HTTPException(400, "invalid options")
     return stream(lambda emit: make_film(premise.strip(), OUT, model, aspect, shots, mode, director, emit))
 
 
 @app.post("/api/reshoot")
-async def reshoot_shot(folder: str = Form(...), index: int = Form(...), action: str = Form("")):
+async def reshoot_shot(folder: str = Form(...), index: int = Form(...), frame: str = Form(""), action: str = Form("")):
     if "/" in folder or ".." in folder or not (OUT / folder / "plan.json").exists():
         raise HTTPException(404, "unknown film")
-    return stream(lambda emit: reshoot(OUT, folder, index, action, emit))
+    return stream(lambda emit: reshoot(OUT, folder, index, frame, action, emit))

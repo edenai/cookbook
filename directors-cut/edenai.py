@@ -1,4 +1,4 @@
-"""The Eden AI calls behind Director's Cut: Claude (chat completions) and PixVerse (video generation). One key."""
+"""The Eden AI calls behind Director's Cut: the director (chat completions), Gemini (images) and PixVerse (video). One key."""
 import asyncio
 import os
 import time
@@ -28,13 +28,19 @@ async def call(method: str, path: str, **kwargs) -> dict:
     return body
 
 
-async def chat(messages: list, model: str, fallbacks: list, schema: dict, extra: dict | None = None) -> dict:
+async def chat(messages: list, model: str, fallbacks: list, schema: dict, extra: dict | None = None, name: str = "film") -> dict:
     extra = extra or {}
     body = {"model": model, "fallbacks": fallbacks, "messages": messages, "max_tokens": 8000, "tags": TAGS,  # room for reasoning tokens
-            "response_format": {"type": "json_schema", "json_schema": {"name": "film", "strict": True, "schema": schema}}, **extra}
+            "response_format": {"type": "json_schema", "json_schema": {"name": name, "strict": True, "schema": schema}}, **extra}
     if "reasoning_effort" not in extra:
         body["temperature"] = 0.7
-    return await call("POST", "/chat/completions", json=body, timeout=240)  # thinking models can take over a minute
+    return await call("POST", "/chat/completions", json=body, timeout=360)  # GLM 5.3 thinks for up to 4 minutes
+
+
+async def image(model: str, prompt: str, references: list[str], size: str) -> dict:
+    """Draw one image (Universal AI image generation), matching the reference images (file ids) when there are any."""
+    inputs = {"text": prompt, "resolution": size, **({"reference_images": references} if references else {})}
+    return await call("POST", "/universal-ai", json={"model": model, "input": inputs, "tags": TAGS}, timeout=180)
 
 
 async def upload(data: bytes, filename: str, content_type: str) -> dict:
