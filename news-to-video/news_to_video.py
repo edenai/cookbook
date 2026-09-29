@@ -50,13 +50,6 @@ def fit(narration: str, max_words: int) -> str:
     return " ".join(kept)
 
 
-async def timed(steps: list, name: str, model: str, call):
-    start = time.perf_counter()
-    body = await call
-    steps.append((name, model, time.perf_counter() - start, float(body.get("cost") or 0)))
-    return body
-
-
 def seconds(path: Path) -> float:
     out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
                          capture_output=True, text=True, check=True).stdout
@@ -102,6 +95,95 @@ def stitch(work: Path, clips: list[str], captions: list[str], narration: str, ou
         raise RuntimeError(f"ffmpeg failed: {result.stderr.strip()[-800:]}")
 
 
+async def make_video(topic: str, out: Path = Path("out"), video_model: str = VIDEO, tts: str = TTS, llm: str = LLM,
+                     captions: bool = True, emit=lambda event: None) -> dict:
+    """Run the whole pipeline. `emit` gets a dict as each step finishes: the CLI prints them, the web view streams them."""
+    now, steps, start = datetime.datetime.now(), [], time.perf_counter()
+    work = out / f"{now:%Y-%m-%d-%H%M%S}-{re.sub(r'[^a-z0-9]+', '-', topic.lower()).strip('-')[:40]}"
+    work.mkdir(parents=True, exist_ok=True)
+
+    async def timed(name, model, call):
+        t = time.perf_counter()
+        body = await call
+        step = {"name": name, "model": model, "seconds": round(time.perf_counter() - t, 1), "cost": float(body.get("cost") or 0)}
+        steps.append(step)
+        return body, step
+
+    # 1. What happened: one web search
+    emit({"event": "searching", "topic": topic, "folder": work.name})
+    found, _ = await timed("web search", "web/search/tavily", edenai.search(f"{topic} news {now:%B %Y}"))
+    results = [{"title": r.get("title"), "url": r.get("url"), "content": (r.get("content") or "")[:1200]}
+               for r in found["output"].get("results") or []]
+    if not results:
+        raise RuntimeError("the search found nothing: try a broader topic")
+
+    # 2. The script: headline, narration and 3 shots, as structured JSON
+    emit({"event": "writing", "results": len(results)})
+    reply, _ = await timed("script", llm, edenai.chat(
+        [{"role": "system", "content": WRITER.format(today=f"{now:%B %d, %Y}")},
+         {"role": "user", "content": json.dumps({"topic": topic, "results": results})}],
+        llm, [m for m in (LLM, LLM_FALLBACK) if m != llm], SCRIPT))
+    script = json.loads(re.search(r"\{.*\}", reply["choices"][0]["message"]["content"], re.S).group())
+    shots = script["shots"][:3]
+    script["narration"] = fit(script["narration"], MAX_WORDS)
+    emit({"event": "script", "title": script["title"], "narration": script["narration"], "captions": [s["caption"] for s in shots],
+          "sources": script["sources"], "video_model": video_model, "tts": tts})
+
+    # 3. The 3 clips (Pruna) and the voice (Gradium), all at once; each is saved and announced as soon as it's ready
+    async def clip(i, shot):
+        body, step = await timed(f"clip {i + 1}", video_model, edenai.video(shot["visual"], video_model, SIZE, SHOT_SECONDS))
+        (work / f"shot{i + 1}.mp4").write_bytes(await edenai.download(body["output"]["video_resource_url"]))
+        emit({"event": "clip", "index": i, "file": f"shot{i + 1}.mp4", **step})
+        return f"shot{i + 1}.mp4"
+
+    async def voice():
+        body, step = await timed("narration", tts, edenai.speak(script["narration"], tts))
+        audio = await edenai.download(body["output"]["audio_resource_url"])
+        name = "narration.wav" if audio[:4] == b"RIFF" else "narration.mp3"
+        (work / name).write_bytes(audio)
+        emit({"event": "narration", **step})
+        return name
+
+    *clips, narration = await asyncio.gather(*(clip(i, s) for i, s in enumerate(shots)), voice())
+
+    # 4. Stitch (in a thread, so a web server stays responsive)
+    emit({"event": "stitching"})
+    t = time.perf_counter()
+    await asyncio.to_thread(stitch, work, clips, [s["caption"] for s in shots], narration, "news.mp4", captions)
+    steps.append({"name": "stitch", "model": "ffmpeg", "seconds": round(time.perf_counter() - t, 1), "cost": 0.0})
+
+    total, elapsed = sum(s["cost"] for s in steps), time.perf_counter() - start
+    table = "\n".join(f"| {s['name']} | `{s['model']}` | {s['seconds']:.1f} s | ${s['cost']:.4f} |" for s in steps)
+    sources = "\n".join(f"- {u}" for u in script["sources"]) or "- (none returned)"
+    (work / "script.md").write_text(
+        f"# {script['title']}\n\n{script['narration']}\n\n## Shots\n\n"
+        + "\n".join(f"{i + 1}. **{s['caption']}**: {s['visual']}" for i, s in enumerate(shots))
+        + f"\n\n## Sources\n\n{sources}\n\n## Run\n\n| Step | Model | Time | Cost |\n|---|---|---|---|\n{table}\n\n"
+          f"Total: {elapsed:.0f} s, ${total:.4f} via Eden AI. AI-generated from web sources; check before publishing.\n")
+    done = {"event": "done", "folder": work.name, "video": "news.mp4", "steps": steps, "cost": round(total, 4), "seconds": round(elapsed)}
+    emit(done)
+    return {**done, "path": work}
+
+
+def print_event(e: dict) -> None:
+    """How the CLI shows progress."""
+    kind = e["event"]
+    if kind == "searching":
+        print(f"Searching the web for: {e['topic']}")
+    elif kind == "writing":
+        print(f"Writing the script from {e['results']} results")
+    elif kind == "script":
+        print(f'  "{e["title"]}"\n  narration ({len(e["narration"].split())} words): {e["narration"]}')
+        print(f"Rendering 3 clips with {e['video_model']} while {e['tts']} reads the narration")
+    elif kind in ("clip", "narration"):
+        print(f"  {e['name']} ready ({e['seconds']} s)")
+    elif kind == "stitching":
+        print("Stitching with ffmpeg")
+    elif kind == "done":
+        print("\n" + "\n".join(f"  {s['name']:<11} {s['model']:<44} {s['seconds']:>6.1f} s  ${s['cost']:.4f}" for s in e["steps"]))
+        print(f"\nDone in {e['seconds']} s for ${e['cost']:.4f} via Eden AI")
+
+
 async def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("topic", help='what the video is about, e.g. "European AI startups this week"')
@@ -115,59 +197,8 @@ async def main() -> None:
         raise SystemExit("ffmpeg is required: brew install ffmpeg / sudo apt install ffmpeg")
     if not edenai.KEY:
         raise SystemExit("EDENAI_API_KEY is not set: copy .env.example to .env")
-
-    today, steps, start = datetime.date.today(), [], time.perf_counter()
-    work = args.out / f"{today}-{re.sub(r'[^a-z0-9]+', '-', args.topic.lower()).strip('-')[:40]}"
-    work.mkdir(parents=True, exist_ok=True)
-
-    # 1. What happened: one web search
-    print(f"Searching the web for: {args.topic}")
-    found = await timed(steps, "web search", "web/search/tavily", edenai.search(f"{args.topic} news {today:%B %Y}"))
-    results = [{"title": r.get("title"), "url": r.get("url"), "content": (r.get("content") or "")[:1200]}
-               for r in found["output"].get("results") or []]
-    if not results:
-        raise SystemExit("The search found nothing: try a broader topic.")
-
-    # 2. The script: headline, narration and 3 shots, as structured JSON
-    print(f"Writing the script from {len(results)} results")
-    reply = await timed(steps, "script", args.llm, edenai.chat(
-        [{"role": "system", "content": WRITER.format(today=f"{today:%B %d, %Y}")},
-         {"role": "user", "content": json.dumps({"topic": args.topic, "results": results})}],
-        args.llm, [m for m in (LLM, LLM_FALLBACK) if m != args.llm], SCRIPT))
-    script = json.loads(re.search(r"\{.*\}", reply["choices"][0]["message"]["content"], re.S).group())
-    shots = script["shots"][:3]
-    script["narration"] = fit(script["narration"], MAX_WORDS)
-    print(f'  "{script["title"]}"\n  narration ({len(script["narration"].split())} words): {script["narration"]}')
-
-    # 3. The 3 clips (Pruna) and the voice (Gradium), all at once
-    print(f"Rendering {len(shots)} clips with {args.video_model} while {args.tts} reads the narration")
-    jobs = [timed(steps, f"clip {i + 1}", args.video_model, edenai.video(s["visual"], args.video_model, SIZE, SHOT_SECONDS))
-            for i, s in enumerate(shots)]
-    *clips, voice = await asyncio.gather(*jobs, timed(steps, "narration", args.tts, edenai.speak(script["narration"], args.tts)))
-    for i, clip in enumerate(clips):
-        (work / f"shot{i + 1}.mp4").write_bytes(await edenai.download(clip["output"]["video_resource_url"]))
-    audio = await edenai.download(voice["output"]["audio_resource_url"])
-    narration = "narration.wav" if audio[:4] == b"RIFF" else "narration.mp3"
-    (work / narration).write_bytes(audio)
-
-    # 4. Stitch
-    print("Stitching with ffmpeg")
-    t = time.perf_counter()
-    stitch(work, [f"shot{i + 1}.mp4" for i in range(len(shots))], [s["caption"] for s in shots], narration,
-           "news.mp4", not args.no_captions)
-    steps.append(("stitch", "ffmpeg", time.perf_counter() - t, 0.0))
-
-    total = sum(s[3] for s in steps)
-    table = "\n".join(f"| {name} | `{model}` | {sec:.1f} s | ${cost:.4f} |" for name, model, sec, cost in steps)
-    sources = "\n".join(f"- {u}" for u in script["sources"]) or "- (none returned)"
-    (work / "script.md").write_text(
-        f"# {script['title']}\n\n{script['narration']}\n\n## Shots\n\n"
-        + "\n".join(f"{i + 1}. **{s['caption']}**: {s['visual']}" for i, s in enumerate(shots))
-        + f"\n\n## Sources\n\n{sources}\n\n## Run\n\n| Step | Model | Time | Cost |\n|---|---|---|---|\n{table}\n\n"
-          f"Total: {time.perf_counter() - start:.0f} s, ${total:.4f} via Eden AI. AI-generated from web sources; check before publishing.\n")
-    print("\n" + "\n".join(f"  {name:<11} {model:<44} {sec:>6.1f} s  ${cost:.4f}" for name, model, sec, cost in steps))
-    print(f"\nDone in {time.perf_counter() - start:.0f} s for ${total:.4f} via Eden AI")
-    print(f"Video:  {work / 'news.mp4'}\nScript: {work / 'script.md'}")
+    result = await make_video(args.topic, args.out, args.video_model, args.tts, args.llm, not args.no_captions, print_event)
+    print(f"Video:  {result['path'] / 'news.mp4'}\nScript: {result['path'] / 'script.md'}")
 
 
 if __name__ == "__main__":
