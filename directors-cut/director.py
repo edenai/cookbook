@@ -18,7 +18,18 @@ import edenai
 MODELS = {"video/generation_async/pixverse/v6": "PixVerse V6", "video/generation_async/pixverse/c1": "PixVerse C1",
           "video/generation_async/pixverse/v5.5": "PixVerse V5.5"}
 MULTI_SHOT = {"video/generation_async/pixverse/v6", "video/generation_async/pixverse/v5.5"}  # native multi-shot takes
-DIRECTORS = {"anthropic/claude-sonnet-latest": "Claude Sonnet", "anthropic/claude-opus-latest": "Claude Opus"}
+# Who writes the shot list. Each is pinned to an endpoint that supports JSON-schema output, with a fallback serving the
+# same model elsewhere. GPT-6 is served by Azure: OpenAI's own endpoint returned 401s on our account when we tested.
+DIRECTORS = {  # id: (label, group, extra request fields, fallbacks)
+    "anthropic/claude-sonnet-latest": ("Claude Sonnet", "Anthropic", {}, ["anthropic/claude-opus-latest"]),
+    "anthropic/claude-opus-latest": ("Claude Opus", "Anthropic", {}, ["anthropic/claude-sonnet-latest"]),
+    "azure/gpt-6-astra": ("GPT-6 Astra", "OpenAI", {}, ["openai/gpt-6-astra"]),
+    "azure/gpt-6-sol": ("GPT-6 Sol", "OpenAI", {}, ["openai/gpt-6-sol"]),
+    "azure/gpt-6-luna": ("GPT-6 Luna", "OpenAI", {}, ["openai/gpt-6-luna"]),
+    "moonshot/kimi-k3": ("Kimi K3", "Open weights", {"reasoning_effort": "low"}, ["together_ai/moonshotai/Kimi-K3"]),
+    "zai/glm-5.3": ("GLM 5.3 (always thinks: about 45-90 s)", "Open weights", {}, ["deepinfra/zai-org/GLM-5.3"]),
+    "nebius/deepseek-ai/DeepSeek-V4-Pro": ("DeepSeek V4 Pro", "Open weights", {}, ["deepinfra/deepseek-ai/DeepSeek-V4-Pro"]),
+}
 SIZES = {"16:9": (1280, 720), "9:16": (720, 1280), "1:1": (720, 720), "21:9": (1680, 720)}  # the edit's frame size
 
 FILM = {"type": "object", "additionalProperties": False, "required": ["title", "logline", "style", "shots"],
@@ -149,12 +160,13 @@ async def make_film(premise: str, out: Path, model: str, aspect: str, shots: int
     work = out / f"{datetime.datetime.now():%Y-%m-%d-%H%M%S}-{slug(premise)}"
     work.mkdir(parents=True, exist_ok=True)
     film = Film(work, emit)
-    emit({"event": "directing", "folder": work.name, "director": DIRECTORS.get(director, director)})
+    label, _, extra, fallbacks = DIRECTORS[director]
+    emit({"event": "directing", "folder": work.name, "director": label})
 
-    # 1. Claude directs: a style bible and the shot list, as structured JSON
+    # 1. The director (Claude by default) writes a style bible and the shot list, as structured JSON
     reply, _ = await film.timed("direction", director, edenai.chat(
         [{"role": "system", "content": DIRECTOR.format(n=shots, aspect=aspect)}, {"role": "user", "content": premise}],
-        director, [d for d in DIRECTORS if d != director], FILM))
+        director, fallbacks, FILM, extra))
     plan = json.loads(re.search(r"\{.*\}", reply["choices"][0]["message"]["content"], re.S).group())
     plan["shots"] = plan["shots"][:shots]
     for s in plan["shots"]:

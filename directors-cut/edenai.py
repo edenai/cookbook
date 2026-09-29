@@ -28,10 +28,13 @@ async def call(method: str, path: str, **kwargs) -> dict:
     return body
 
 
-async def chat(messages: list, model: str, fallbacks: list, schema: dict) -> dict:
-    return await call("POST", "/chat/completions", json={
-        "model": model, "fallbacks": fallbacks, "messages": messages, "temperature": 0.7, "max_tokens": 4000, "tags": TAGS,
-        "response_format": {"type": "json_schema", "json_schema": {"name": "film", "strict": True, "schema": schema}}})
+async def chat(messages: list, model: str, fallbacks: list, schema: dict, extra: dict | None = None) -> dict:
+    extra = extra or {}
+    body = {"model": model, "fallbacks": fallbacks, "messages": messages, "max_tokens": 8000, "tags": TAGS,  # room for reasoning tokens
+            "response_format": {"type": "json_schema", "json_schema": {"name": "film", "strict": True, "schema": schema}}, **extra}
+    if "reasoning_effort" not in extra:
+        body["temperature"] = 0.7
+    return await call("POST", "/chat/completions", json=body, timeout=240)  # thinking models can take over a minute
 
 
 async def upload(data: bytes, filename: str, content_type: str) -> dict:

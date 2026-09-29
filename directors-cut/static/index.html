@@ -5,49 +5,53 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Director's Cut</title>
 <style>
-  :root { --bg: #0b0d12; --panel: #151923; --line: #2a3040; --text: #f2f4f8; --muted: #8b93a7; --ok: #6ee7b7; --err: #f87171;
-          --claude: #f0a37c; --pixverse: #c084fc; }
+  :root { --bg: #f6f5f1; --panel: #ffffff; --soft: #fbfaf7; --line: #e3e0d8; --text: #1d1c1a; --muted: #6b675f; --ok: #15803d; --err: #b91c1c;
+          --claude: #c2410c; --pixverse: #7c3aed; --screen: #17171c; }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.5 system-ui, sans-serif; }
   .wrap { max-width: 1440px; margin: auto; padding: 26px 32px; }
   .eyebrow { color: var(--muted); font-size: 14px; letter-spacing: .12em; text-transform: uppercase; }
   h1 { margin: 2px 0 0; font-size: 44px; } .sub { color: var(--muted); margin: 4px 0 14px; }
   .chips { display: flex; gap: 8px; flex-wrap: wrap; }
-  .chip { border: 1px solid var(--c, var(--line)); border-radius: 999px; padding: 4px 12px; font-size: 15px; color: var(--muted); }
+  .chip { background: var(--panel); border: 1px solid var(--c, var(--line)); border-radius: 999px; padding: 4px 12px; font-size: 15px; color: var(--muted); }
   .chip b { color: var(--c, var(--text)); }
-  .panel { background: var(--panel); border-radius: 16px; padding: 18px 20px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
   form.panel { margin-top: 22px; }
-  textarea, input, select, button { font: inherit; color: var(--text); background: #0f1219; border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; }
+  textarea, input, select, button { font: inherit; color: var(--text); background: var(--soft); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; }
   textarea { width: 100%; resize: vertical; min-height: 64px; }
+  textarea:focus, select:focus { outline: 2px solid color-mix(in srgb, var(--pixverse) 35%, transparent); border-color: var(--pixverse); }
   .examples { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 12px; }
-  .examples button { font-size: 14px; padding: 4px 10px; color: var(--muted); cursor: pointer; }
+  .examples button { font-size: 14px; padding: 4px 10px; color: var(--muted); cursor: pointer; background: var(--panel); }
+  .examples button:hover { color: var(--text); border-color: var(--muted); }
   .controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
   .controls label { display: flex; flex-direction: column; font-size: 13px; color: var(--muted); gap: 3px; }
-  #go { background: var(--pixverse); color: #111; border: 0; font-weight: 700; padding: 10px 22px; cursor: pointer; margin-left: auto; }
+  #go { background: var(--pixverse); color: #fff; border: 0; font-weight: 700; padding: 10px 22px; cursor: pointer; margin-left: auto; }
   button:disabled { opacity: .5; cursor: wait; }
   #timer { font: 600 26px ui-monospace, monospace; min-width: 96px; text-align: right; }
   #error { color: var(--err); margin: 10px 0 0; min-height: 1em; }
   .pipeline { list-style: none; padding: 0; margin: 16px 0 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-  .pipeline li { background: var(--panel); border-top: 3px solid var(--c); border-radius: 10px; padding: 10px 12px; opacity: .45; }
-  .pipeline li b { display: block; } .pipeline li span { color: var(--c); font-size: 15px; } .pipeline li small { display: block; color: var(--muted); font-size: 14px; min-height: 20px; }
+  .pipeline li { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--c); border-radius: 10px; padding: 10px 12px; opacity: .55; }
+  .pipeline li b { display: block; } .pipeline li span { color: var(--c); font-size: 15px; font-weight: 600; } .pipeline li small { display: block; color: var(--muted); font-size: 14px; min-height: 20px; }
   .pipeline li.run { opacity: 1; animation: glow 1.2s infinite; } .pipeline li.ok { opacity: 1; } .pipeline li.err { opacity: 1; border-top-color: var(--err); }
-  @keyframes glow { 50% { background: #1d2333; } }
+  @keyframes glow { 50% { background: #f1ecff; } }
   .grid { display: grid; grid-template-columns: 1fr 480px; gap: 26px; margin-top: 20px; align-items: start; }
   @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } }
   #title { font-size: 30px; font-weight: 800; } #logline { color: var(--muted); }
   details { margin: 8px 0 4px; color: var(--muted); font-size: 15px; } summary { cursor: pointer; }
   .board { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; margin-top: 14px; }
-  .card { background: #0f1219; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
-  .card .frame { aspect-ratio: var(--ar, 16 / 9); background: #07080c; display: flex; align-items: center; justify-content: center;
-                 color: var(--muted); font-size: 14px; text-align: center; padding: 8px; }
-  .card .frame.rolling { animation: glow 1.2s infinite; color: var(--pixverse); }
+  .card { background: var(--soft); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+  .card .frame { aspect-ratio: var(--ar, 16 / 9); background: var(--screen); display: flex; align-items: center; justify-content: center;
+                 color: #c9c6be; font-size: 14px; text-align: center; padding: 8px; }
+  .card .frame.rolling { animation: roll 1.2s infinite; color: #d8c8ff; }
+  @keyframes roll { 50% { background: #2a2536; } }
   .card video { width: 100%; height: 100%; object-fit: cover; }
   .card .body { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
   .card h3 { margin: 0; font-size: 15px; } .card h3 small { color: var(--muted); font-weight: 400; }
-  .card textarea { font-size: 14px; min-height: 84px; padding: 6px 8px; }
+  .card textarea { font-size: 14px; min-height: 84px; padding: 6px 8px; background: var(--panel); }
   .card .sound { color: var(--muted); }
-  .card button { font-size: 14px; padding: 5px 10px; cursor: pointer; align-self: flex-start; }
-  #final { width: 100%; aspect-ratio: var(--ar, 16 / 9); background: #000; border-radius: 12px; }
+  .card button { font-size: 14px; padding: 5px 10px; cursor: pointer; align-self: flex-start; background: var(--panel); }
+  .card button:not(:disabled):hover { border-color: var(--pixverse); color: var(--pixverse); }
+  #final { width: 100%; aspect-ratio: var(--ar, 16 / 9); background: var(--screen); border-radius: 12px; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 12px; }
   td { padding: 5px 2px; border-top: 1px solid var(--line); } td code { color: var(--muted); font-size: 12px; word-break: break-all; }
   .num { text-align: right; white-space: nowrap; } tfoot td { font-weight: 700; color: var(--ok); }
@@ -60,11 +64,11 @@
   <header>
     <div class="eyebrow">Eden AI Cookbook</div>
     <h1>Director's Cut</h1>
-    <div class="sub">Describe a film. Claude writes and cuts the shot list, PixVerse shoots every shot with its own sound, and you get the edit.</div>
+    <div class="sub">Describe a film. An LLM director writes and cuts the shot list, PixVerse shoots every shot with its own sound, and you get the edit.</div>
     <div class="chips">
-      <span class="chip" style="--c: var(--claude)"><b>Claude</b> director and editor</span>
+      <span class="chip" style="--c: var(--claude)"><b>Director</b> Claude, GPT-6, Kimi K3, GLM 5.3 or DeepSeek V4</span>
       <span class="chip" style="--c: var(--pixverse)"><b>PixVerse</b> camera: native audio, multi-shot, image-to-video</span>
-      <span class="chip"><b>Eden AI</b> one key for both</span>
+      <span class="chip"><b>Eden AI</b> one key for all of them</span>
     </div>
   </header>
 
@@ -106,7 +110,7 @@
     </aside>
   </div>
 
-  <footer>Claude (the director) and PixVerse (the camera) both run through <a href="https://www.edenai.co" target="_blank" rel="noopener">Eden AI</a>
+  <footer>The director and PixVerse (the camera) both run through <a href="https://www.edenai.co" target="_blank" rel="noopener">Eden AI</a>
     with one API key: every call's time and cost is in the table, on one bill. Films are labelled AI-generated.
     Part of the <a href="https://github.com/edenai/cookbook" target="_blank" rel="noopener">Eden AI Cookbook</a>.</footer>
 </div>
@@ -127,7 +131,9 @@ let options, film = null, allSteps = [], started, ticker, running, busy = false;
 fetch("/api/options").then((r) => r.json()).then((o) => {
   options = o;
   $("model").innerHTML = Object.entries(o.models).map(([id, n]) => `<option value="${id}">${n}</option>`).join("");
-  $("director").innerHTML = Object.entries(o.directors).map(([id, n]) => `<option value="${id}">${n}</option>`).join("");
+  const groups = [...new Set(o.directors.map((d) => d.group))];  // Anthropic / OpenAI / Open weights
+  $("director").innerHTML = groups.map((g) => `<optgroup label="${g}">` +
+    o.directors.filter((d) => d.group === g).map((d) => `<option value="${d.id}">${esc(d.label)}</option>`).join("") + "</optgroup>").join("");
   $("aspect").innerHTML = o.aspects.map((a) => `<option>${a}</option>`).join("");
   $("model").onchange = () => {  // C1 has no multi-shot takes
     const multi = o.multishot.includes($("model").value);

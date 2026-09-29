@@ -29,7 +29,8 @@ def index():
 
 @app.get("/api/options")
 def options():
-    return {"models": MODELS, "multishot": sorted(MULTI_SHOT), "directors": DIRECTORS, "aspects": list(SIZES)}
+    return {"models": MODELS, "multishot": sorted(MULTI_SHOT), "aspects": list(SIZES),
+            "directors": [{"id": k, "label": v[0], "group": v[1]} for k, v in DIRECTORS.items()]}
 
 
 def stream(job) -> StreamingResponse:
