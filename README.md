@@ -5,6 +5,7 @@ Runnable demos built on [Eden AI](https://www.edenai.co): one API key and one bi
 | Demo | What it shows | Providers | Eden AI endpoints |
 |---|---|---|---|
 | [voice-web-research](voice-web-research/) | Ask a question out loud and get a cited, spoken answer from the live web | Gradium (speech-to-text, text-to-speech), Nebius (LLM), Tavily (search) | `/v3/upload`, `/v3/universal-ai` (+ async), `/v3/chat/completions` |
+| [directors-cut](directors-cut/) | Describe a film: an LLM director writes and cuts the shot list, PixVerse shoots every shot with native audio, and you can reshoot any shot | Claude, GPT-6, Kimi K3, GLM 5.3 or DeepSeek V4 Pro (director), PixVerse (video) | `/v3/chat/completions` (structured output), `/v3/universal-ai/async` |
 | [news-to-video](news-to-video/) | Turns a topic into a narrated 9:16 news clip built from today's web, in 30–45 seconds | Tavily (search), Nebius (LLM), Pruna (video), Gradium (voice) | `/v3/universal-ai` (+ async), `/v3/chat/completions` (structured output) |
 | [upstream-watch](upstream-watch/) | A daily GitHub Action where the web tells a repo its dependencies are stale: it opens cited bump PRs, plus issues for breaking changes | Tavily (search), Nebius (LLM) | `/v3/universal-ai`, `/v3/chat/completions` (structured output) |
 
@@ -14,9 +15,11 @@ Each demo picks the provider that's best at its step. Each demo's README has a *
 
 | Provider | What it does here | Why it's a great fit | Demos |
 |---|---|---|---|
-| **Tavily** | Web search | A search API built for AI agents. It returns cleaned, ranked page content that an LLM can cite straight away, in about a second, for $0.008 per search | all three |
-| **Nebius** | LLMs: Qwen3-235B, gpt-oss-120b | Nebius Token Factory serves open-weight models behind an OpenAI-compatible API, with reliable tool calling and strict JSON-schema output, for under $0.001 per call in these demos | all three |
+| **Tavily** | Web search | A search API built for AI agents. It returns cleaned, ranked page content that an LLM can cite straight away, in about a second, for $0.008 per search | voice-web-research, news-to-video, upstream-watch |
+| **Nebius** | LLMs: Qwen3-235B, gpt-oss-120b | Nebius Token Factory serves open-weight models behind an OpenAI-compatible API, with reliable tool calling and strict JSON-schema output, for under $0.001 per call in these demos | voice-web-research, news-to-video, upstream-watch |
 | **Gradium** | Speech-to-text and text-to-speech | A voice specialist built by the team behind the Kyutai research lab, listed as EU-hosted on Eden AI. It gives accurate transcripts of browser recordings and a natural reading voice | voice-web-research, news-to-video |
+| **Claude** | Director (the default of eight): writes and cuts shot lists | Strict JSON-schema output turns a premise into a shot list, and a "style bible" keeps characters consistent across separately rendered shots. GPT-6, Kimi K3, GLM 5.3 and DeepSeek V4 Pro can direct too, for comparison | directors-cut |
+| **PixVerse** | Video generation with native audio | V6 renders every shot with its own sound, follows camera language, and can cut a multi-shot sequence in one generation. C1 covers cinematic, action-heavy scenes | directors-cut |
 | **Pruna** | Video generation | Built for speed. A 5 s vertical clip with its own soundtrack costs $0.10, so three render in parallel within a half-minute pipeline. Pruna reports that its newest model, P-Video-2-Pro, ranks #2 overall on the Design Arena video leaderboard | news-to-video |
 
 ## How the cookbook is organized
