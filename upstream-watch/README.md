@@ -14,6 +14,25 @@ Trigger (cron) → Signal (Tavily search per package) → Triage (LLM → JSON v
      → breaking: issue + migration plan (code is never edited)
 ```
 
+| At a glance | |
+|---|---|
+| Providers | Tavily (web search), Nebius (LLM with structured output) |
+| One run | About 30 s and $0.06 for 7 packages; one PR or issue per real finding |
+| Runs as | A GitHub Action on a daily schedule plus a "Run workflow" button, or a local dry run |
+| Eden AI endpoints | `/v3/universal-ai`, `/v3/chat/completions` (JSON schema) |
+
+## Why these providers
+
+| Step | Provider, via Eden AI | Why it's a great fit here |
+|---|---|---|
+| Signal | **Tavily** `web/search/tavily` | It turns the public web into an event source. Tavily is a search API built for AI agents, so each package's search returns cleaned, ranked page content: release notes, changelogs and advisories the LLM can judge. On flaskr-tdd's real pins it surfaced the Flask 3.1.3 security fix (CVE-2026-27205) and the gunicorn and pytest CVEs, at $0.008 a package. |
+| Triage and drafts | **Nebius** `nebius/Qwen/Qwen3-235B-A22B-Instruct-2507` | Triage has to be machine-readable every time, and this open-weight model on Nebius Token Factory returns strict JSON-schema verdicts. It also writes the migration plans for breaking issues. Each call cost about $0.0004, so the LLM is a rounding error on the bill. `nebius/openai/gpt-oss-120b` is the automatic fallback. |
+
+**Why Eden AI ties it together:**
+- **One repo secret** (`EDENAI_API_KEY`) covers both providers.
+- **Fallbacks:** Tavily falls back to Linkup, and Qwen to gpt-oss, so a flaky provider doesn't turn the daily run red.
+- **Per-repo cost:** every call is tagged `repo=<owner>/<repo>`, and the summed `cost` fields go into each PR and issue body and set the run's hard cost cap.
+
 ## Try it locally (dry run: prints, changes nothing)
 
 ```bash

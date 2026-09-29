@@ -9,13 +9,21 @@ For this demo we put all of it behind Eden AI. The result is *Ask the web, out l
 1. **The browser records** the question with `MediaRecorder` and posts it to the backend.
 2. **Speech to text.** The backend uploads the audio to Eden AI (`POST /v3/upload`) and starts an async Gradium job (`audio/speech_to_text_async/gradium`). It polls until the transcript is ready.
 3. **LLM plus search.** The transcript goes to `POST /v3/chat/completions`, Eden AI's OpenAI-compatible endpoint, running `nebius/Qwen/Qwen3-235B-A22B-Instruct-2507` with one tool, `web_search`. When the model calls it, the backend runs `web/search/tavily` through Eden AI's Universal AI endpoint and returns the results to the model.
-4. **Text to speech.** The final answer, minus its source list, goes to `audio/tts/gradium`, and the browser plays the returned audio URL.
+4. **Text to speech.** The final answer, minus its source list, goes to `audio/tts/gradium`. The backend fetches the audio and hands it to the page, which plays it.
 
 The page shows a **Stack** panel with one row per call: the provider, the model, the latency and the cost, plus a total. That panel is the point of the demo. Gradium, Nebius and Tavily each serve part of the answer, each call returns its own `cost`, and the total is one line on one bill.
 
+## Why Gradium, Tavily and Nebius
+
+Each provider is here because of what it's best at in this loop:
+
+- **Gradium for both ends of the voice.** Voice is all Gradium does. It's the Paris company built by the team behind the Kyutai research lab, and it reports top latency results on the independent Coval voice benchmarks. In our runs it transcribed a browser recording word for word in about 6 seconds and read an 80-word answer in a natural voice for about three cents. Eden AI lists both of those Gradium models as EU-hosted.
+- **Tavily for the web.** Tavily is a search API built for AI agents. It returns cleaned, ranked page content rather than links, which is exactly what an LLM needs in order to cite. A search took about a second and cost $0.008.
+- **Nebius for the reasoning.** Nebius Token Factory serves open-weight models, here Qwen3-235B, behind an OpenAI-compatible API with reliable tool calling. That's the one feature this agent loop can't do without. Each turn took one to five seconds and cost under a tenth of a cent.
+
 ## One request shape for everything that isn't an LLM
 
-Speech-to-text, search and text-to-speech are three different vendors, but on Eden AI they all use the same call:
+Speech-to-text, search and text-to-speech come from two vendors here, but on Eden AI they all use the same call:
 
 ```python
 await call("POST", "/universal-ai", json={
@@ -62,7 +70,7 @@ Measured with real calls, one question costs about **four cents**. Most of that 
 ```bash
 cd voice-web-research && pip install -r requirements.txt
 cp .env.example .env   # add your Eden AI key
-python make_sample.py  # backup question for noisy rooms
+python make_sample.py  # optional: regenerate the backup question
 uvicorn app:app --reload
 ```
 
