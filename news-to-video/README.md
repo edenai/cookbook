@@ -8,7 +8,29 @@ topic → Tavily web search → Nebius LLM writes a headline, a narration and 3 
       → ffmpeg joins them into a vertical video with captions
 ```
 
-Four providers, one Eden AI key. Pruna's fast video models are what make the whole thing fit in about half a minute. Each clip comes with its own soundtrack, which plays at 20% under the narration.
+| At a glance | |
+|---|---|
+| Providers | Tavily (web search), Nebius (script), Pruna (video), Gradium (narration) |
+| One video | 30–45 s end to end; about $0.32; 720×1280, 15–18 s, with captions and an *AI-generated* label |
+| Runs as | A local web page that streams each step live, or a command-line tool |
+| Eden AI endpoints | `/v3/universal-ai` (+ async), `/v3/chat/completions` (JSON schema) |
+
+## Why these providers
+
+| Step | Provider, via Eden AI | Why it's a great fit here |
+|---|---|---|
+| Search | **Tavily** `web/search/tavily` | A search API built for AI agents. It returns cleaned, ranked page content, so the script is written from today's articles rather than the model's memory. That was 6 results in 0.5–1.9 s for $0.008. |
+| Script | **Nebius** `nebius/openai/gpt-oss-120b` | Strict JSON-schema output means the headline, narration and 3 shots always come back parseable. It's an open-weight model on Nebius Token Factory: about 3 s and under $0.001 per script. That's about 3× faster than Qwen for this task, with more specific captions ("Nscale $2B raise" rather than "Funding Surge"). |
+| Video | **Pruna** `video/generation_async/pruna/p-video` | Speed is Pruna's whole focus: it builds optimized, faster models. A 5 s, 704×1280 clip with its own soundtrack costs $0.10 and took 13–45 s through Eden AI, so three in parallel keep the whole video to about half a minute. Pruna reports that its newest model, P-Video-2-Pro, ranks #2 overall on the Design Arena video leaderboard while sitting on its quality-versus-speed frontier (about 2 s for a 5 s clip in Speed mode). It isn't on Eden AI yet; when it is, it's one `--video-model` flag away. |
+| Narration | **Gradium** `audio/tts/gradium` | A natural newsreader voice from the Paris voice company behind the Kyutai lab's research, listed as EU-hosted on Eden AI. The 34-word narration takes 6–8 s and about $0.012. It finishes while the clips are still rendering, so it's never what you wait for. |
+
+**Why Eden AI ties it together:**
+- **One key** for four providers, and one bill.
+- **One video endpoint:** a different video model is a one-string change.
+- **Fallbacks** for search (Linkup) and the LLM (Qwen).
+- **Visible cost:** every call is tagged `demo=news-to-video` and shown in the cost table with its time.
+
+Each Pruna clip comes with its own soundtrack, which plays at 20% under the narration.
 
 ## Run it
 
@@ -61,7 +83,7 @@ Each run gets its own folder, `out/<date>-<time>-<topic>/`, containing:
 ## Demo script (about 1 minute)
 
 1. Open the web view full screen and ask the audience for a topic.
-2. Press **Generate**. Talk over the steps as they turn green: the web search, then the script, then **three Pruna clips rendering at the same time**, each appearing in its slot as it lands.
+2. Press **Generate**. Talk over the pipeline as it lights up: *Search* (Tavily), *Script* (Nebius), then **three Pruna clips rendering at the same time**, each appearing in its slot as it lands, while *Narration* (Gradium) finishes alongside.
 3. When the timer stops, at about 30–45 s, play the final video. Point at the cost table: four providers, one key, about $0.32.
 
 ## How it works
@@ -70,7 +92,7 @@ Each run gets its own folder, `out/<date>-<time>-<topic>/`, containing:
 |---|---|
 | `news_to_video.py` | `make_video()` runs the pipeline: search → script (structured JSON) → 3 clips and the narration in parallel → `ffmpeg` stitch → `script.md`. It reports each step as it finishes; the CLI prints these updates |
 | `app.py` | Web view: `POST /api/run` streams those step updates to the page as one JSON object per line, and `/out/` serves the clips and the video |
-| `static/index.html` | The page: topic box, step checklist and timer, 3 clip slots, the final 9:16 video and the cost table |
+| `static/index.html` | The page: topic box, a live five-step pipeline with a timer, 3 clip slots, the final 9:16 video and the cost table |
 | `edenai.py` | The Eden AI calls: `web/search/tavily` (falls back to linkup), `/v3/chat/completions` with a JSON schema, `video/generation_async/pruna/p-video` (async job plus polling), `audio/tts/gradium`, and a plain download of the results |
 
 The details that keep it reliable:
@@ -89,11 +111,11 @@ The details that keep it reliable:
 | `--llm` | `nebius/openai/gpt-oss-120b` | Falls back to `nebius/Qwen/Qwen3-235B-A22B-Instruct-2507`. Qwen took about 9 s here against about 3 s for gpt-oss |
 | `--tts` | `audio/tts/gradium` | Any Eden AI TTS, e.g. `audio/tts/deepgram/aura-2` or `audio/tts/elevenlabs` |
 | `--no-captions` | captions on | |
-| `--out` | `out/` | One folder per run, named `<date>-<topic>` |
+| `--out` | `out/` | One folder per run, named `<date>-<time>-<topic>` |
 
 ## Cost and timing
 
-About **$0.32 per video**. Almost all of it is the three 5-second Pruna clips ($0.02 per second, so $0.10 each); the search, LLM and narration add about $0.02 together. End to end it takes **30–65 s**. The clips dominate, because Pruna's latency through Eden AI varied from about 16 s to 45 s per clip across our runs. The three render in parallel, so a run waits for the slowest one.
+About **$0.32 per video**. Almost all of it is the three 5-second Pruna clips ($0.02 per second, so $0.10 each); the search, LLM and narration add about $0.02 together. End to end it takes **30–45 s**. The very first run took 64 s, before the script writer was switched from Qwen to gpt-oss. The clips dominate, because Pruna's latency through Eden AI varied from about 13 s to 45 s per clip across our runs. The three render in parallel, so a run waits for the slowest one.
 
 **P-Video-2-Pro**, Pruna's newest model (a 5 s clip in about 2 s in Speed mode), isn't on Eden AI yet. When it is, pass it as `--video-model` and the clip step should shrink to a few seconds.
 

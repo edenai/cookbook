@@ -8,6 +8,17 @@ Runnable demos built on [Eden AI](https://www.edenai.co): one API key and one bi
 | [news-to-video](news-to-video/) | Turns a topic into a narrated 9:16 news clip built from today's web, in 30–45 seconds | Tavily (search), Nebius (LLM), Pruna (video), Gradium (voice) | `/v3/universal-ai` (+ async), `/v3/chat/completions` (structured output) |
 | [upstream-watch](upstream-watch/) | A daily GitHub Action where the web tells a repo its dependencies are stale: it opens cited bump PRs, plus issues for breaking changes | Tavily (search), Nebius (LLM) | `/v3/universal-ai`, `/v3/chat/completions` (structured output) |
 
+## Providers in this cookbook
+
+Each demo picks the provider that's best at its step. Each demo's README has a **Why these providers** section with the numbers we measured.
+
+| Provider | What it does here | Why it's a great fit | Demos |
+|---|---|---|---|
+| **Tavily** | Web search | A search API built for AI agents. It returns cleaned, ranked page content that an LLM can cite straight away, in about a second, for $0.008 per search | all three |
+| **Nebius** | LLMs: Qwen3-235B, gpt-oss-120b | Nebius Token Factory serves open-weight models behind an OpenAI-compatible API, with reliable tool calling and strict JSON-schema output, for under $0.001 per call in these demos | all three |
+| **Gradium** | Speech-to-text and text-to-speech | A voice specialist built by the team behind the Kyutai research lab, listed as EU-hosted on Eden AI. It gives accurate transcripts of browser recordings and a natural reading voice | voice-web-research, news-to-video |
+| **Pruna** | Video generation | Built for speed. A 5 s vertical clip with its own soundtrack costs $0.10, so three render in parallel within a half-minute pipeline. Pruna reports that its newest model, P-Video-2-Pro, ranks #2 overall on the Design Arena video leaderboard | news-to-video |
+
 ## How the cookbook is organized
 
 - **One folder per demo**, named after what it does. Providers are listed in the table, not used as folders, because most demos mix several of them and let you swap them.

@@ -5,40 +5,60 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>News to video</title>
 <style>
-  :root { --bg: #0b0d12; --panel: #151923; --line: #2a3040; --text: #f2f4f8; --muted: #8b93a7; --accent: #a78bfa; --ok: #6ee7b7; --err: #f87171; }
+  :root { --bg: #0b0d12; --panel: #151923; --line: #2a3040; --text: #f2f4f8; --muted: #8b93a7; --ok: #6ee7b7; --err: #f87171;
+          --tavily: #60a5fa; --nebius: #34d399; --gradium: #fbbf24; --pruna: #a78bfa; }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 18px/1.5 system-ui, sans-serif; }
-  main { max-width: 1400px; margin: auto; padding: 28px; }
-  h1 { margin: 0; font-size: 40px; } .sub { color: var(--muted); margin: 2px 0 22px; }
-  form { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .wrap { max-width: 1400px; margin: auto; padding: 28px 32px; }
+  .eyebrow { color: var(--muted); font-size: 14px; letter-spacing: .12em; text-transform: uppercase; }
+  h1 { margin: 2px 0 0; font-size: 44px; } .sub { color: var(--muted); margin: 4px 0 14px; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { border: 1px solid var(--c, var(--line)); border-radius: 999px; padding: 4px 12px; font-size: 15px; color: var(--muted); }
+  .chip b { color: var(--c, var(--text)); }
+  form { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 24px; }
   input, select, button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
-  input { flex: 1; min-width: 260px; } button { background: var(--accent); color: #111; font-weight: 600; cursor: pointer; border: 0; }
+  input { flex: 1; min-width: 260px; } button { background: var(--pruna); color: #111; font-weight: 600; cursor: pointer; border: 0; }
   button:disabled { opacity: .5; cursor: wait; }
-  #timer { font: 600 28px ui-monospace, monospace; min-width: 90px; text-align: right; }
-  .grid { display: grid; grid-template-columns: 1fr 420px; gap: 28px; margin-top: 24px; }
+  #timer { font: 600 28px ui-monospace, monospace; min-width: 100px; text-align: right; }
+  #error { color: var(--err); margin-top: 10px; min-height: 1em; }
+  .pipeline { list-style: none; padding: 0; margin: 18px 0 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  @media (max-width: 800px) { .pipeline { grid-template-columns: repeat(2, 1fr); } }
+  .pipeline li { background: var(--panel); border-top: 3px solid var(--c); border-radius: 10px; padding: 10px 12px; opacity: .45; }
+  .pipeline li b { display: block; } .pipeline li span { color: var(--c); font-size: 15px; } .pipeline li small { display: block; color: var(--muted); font-size: 14px; min-height: 20px; }
+  .pipeline li.run { opacity: 1; animation: glow 1.2s infinite; } .pipeline li.ok { opacity: 1; } .pipeline li.err { opacity: 1; border-top-color: var(--err); }
+  @keyframes glow { 50% { background: #1d2333; } }
+  .grid { display: grid; grid-template-columns: 1fr 420px; gap: 28px; margin-top: 22px; }
   @media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } }
   .panel { background: var(--panel); border-radius: 16px; padding: 20px; }
-  ol { list-style: none; padding: 0; margin: 0; }
-  li { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); color: var(--muted); }
-  li.run { color: var(--text); } li.run::before { content: "◌ "; } li.ok { color: var(--ok); } li.ok::before { content: "✓ "; }
-  li span:first-child { flex: 1; } li small { color: var(--muted); }
-  #title { font-size: 26px; font-weight: 700; margin: 18px 0 4px; } #narration { color: var(--muted); }
+  #title { font-size: 28px; font-weight: 700; } #narration { color: var(--muted); margin-top: 4px; min-height: 1.5em; }
   .clips { display: flex; gap: 12px; margin-top: 16px; }
   .clip { flex: 1; aspect-ratio: 9 / 16; background: #0f1219; border: 1px dashed var(--line); border-radius: 12px; overflow: hidden;
-          display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 15px; text-align: center; }
+          display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 15px; text-align: center; padding: 8px; }
   .clip video { width: 100%; height: 100%; object-fit: cover; }
+  .clip.ready { border: 1px solid var(--pruna); padding: 0; }
   #final { width: 100%; aspect-ratio: 9 / 16; background: #000; border-radius: 16px; }
   table { width: 100%; border-collapse: collapse; font-size: 15px; margin-top: 14px; }
   td { padding: 6px 2px; border-top: 1px solid var(--line); } td code { color: var(--muted); font-size: 12px; word-break: break-all; }
   .num { text-align: right; white-space: nowrap; } tfoot td { font-weight: 700; color: var(--ok); }
-  #error { color: var(--err); margin-top: 12px; } a { color: var(--accent); }
-  #sources { font-size: 14px; word-break: break-all; }
+  a { color: var(--pruna); } #sources { font-size: 14px; word-break: break-all; margin-top: 10px; }
+  footer { color: var(--muted); font-size: 14px; margin-top: 36px; border-top: 1px solid var(--line); padding-top: 14px; }
+  footer a { color: var(--muted); }
 </style>
 </head>
 <body>
-<main>
-  <h1>News to video</h1>
-  <div class="sub">Tavily · Nebius · Pruna · Gradium — one API key via Eden AI</div>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Eden AI Cookbook</div>
+    <h1>News to video</h1>
+    <div class="sub">Give it a topic. Today's web becomes a narrated vertical news clip in about half a minute.</div>
+    <div class="chips">
+      <span class="chip" style="--c: var(--tavily)"><b>Tavily</b> web search</span>
+      <span class="chip" style="--c: var(--nebius)"><b>Nebius</b> script writer</span>
+      <span class="chip" style="--c: var(--pruna)"><b>Pruna</b> fast video</span>
+      <span class="chip" style="--c: var(--gradium)"><b>Gradium</b> narration</span>
+      <span class="chip"><b>Eden AI</b> one key for all of them</span>
+    </div>
+  </header>
   <form onsubmit="event.preventDefault(); generate()">
     <input id="topic" placeholder="A topic, e.g. European AI startups" required>
     <select id="model"></select>
@@ -46,16 +66,16 @@
     <div id="timer">0.0 s</div>
   </form>
   <div id="error"></div>
+  <ol class="pipeline">
+    <li id="p-search" style="--c: var(--tavily)"><b>Search</b><span>Tavily</span><small></small></li>
+    <li id="p-script" style="--c: var(--nebius)"><b>Script</b><span>Nebius</span><small></small></li>
+    <li id="p-clips" style="--c: var(--pruna)"><b>3 clips, in parallel</b><span>Pruna</span><small></small></li>
+    <li id="p-voice" style="--c: var(--gradium)"><b>Narration</b><span>Gradium</span><small></small></li>
+    <li id="p-stitch" style="--c: var(--muted)"><b>Stitch 9:16</b><span>ffmpeg</span><small></small></li>
+  </ol>
   <div class="grid">
     <section class="panel">
-      <ol>
-        <li id="s-search" data-who="Tavily"><span>Search today's web</span><small>Tavily</small></li>
-        <li id="s-script" data-who="Nebius"><span>Write headline, narration and 3 shots</span><small>Nebius</small></li>
-        <li id="s-clips" data-who="Pruna"><span>Render 3 clips in parallel</span><small>Pruna</small></li>
-        <li id="s-voice" data-who="Gradium"><span>Record the narration</span><small>Gradium</small></li>
-        <li id="s-stitch" data-who="ffmpeg"><span>Stitch the 9:16 video</span><small>ffmpeg</small></li>
-      </ol>
-      <div id="title"></div>
+      <div id="title">Your headline appears here</div>
       <div id="narration"></div>
       <div class="clips"><div class="clip" id="c0">clip 1</div><div class="clip" id="c1">clip 2</div><div class="clip" id="c2">clip 3</div></div>
     </section>
@@ -65,24 +85,29 @@
       <div id="sources"></div>
     </aside>
   </div>
-</main>
+  <footer>Every AI call on this page goes through <a href="https://www.edenai.co" target="_blank" rel="noopener">Eden AI</a> with one API key:
+    four providers, each with its own time and cost in the table, on one bill. Videos are labelled AI-generated; check the sources before publishing.
+    Part of the <a href="https://github.com/edenai/cookbook" target="_blank" rel="noopener">Eden AI Cookbook</a>.</footer>
+</div>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const host = (u) => { try { return new URL(u).hostname; } catch { return u; } };
 fetch("/api/models").then((r) => r.json()).then((m) => ($("model").innerHTML = m.map((x) => `<option>${x}</option>`).join("")));
 
-let started, ticker, folder, clipsDone;
-const step = (id, state, note = "") => {  // state: "" pending, "run", "ok"
-  $(id).className = state;
-  $(id).querySelector("small").textContent = note || $(id).dataset.who;
-};
-const host = (u) => { try { return new URL(u).hostname; } catch { return u; } };
+let started, ticker, folder, clipsDone, running;
 const at = () => `${((performance.now() - started) / 1000).toFixed(1)} s`;
+function stage(name, state, note = "") {  // state: "" pending, "run", "ok", "err"
+  $(`p-${name}`).className = state;
+  $(`p-${name}`).querySelector("small").textContent = note;
+  if (state === "run") running = name;
+}
 
 async function generate() {
-  ["s-search", "s-script", "s-clips", "s-voice", "s-stitch"].forEach((id) => step(id, ""));
-  ["title", "narration", "error", "sources", "steps", "total"].forEach((id) => ($(id).innerHTML = ""));
-  [0, 1, 2].forEach((i) => ($(`c${i}`).textContent = `clip ${i + 1}`));
+  ["search", "script", "clips", "voice", "stitch"].forEach((s) => stage(s, ""));
+  ["narration", "error", "sources", "steps", "total"].forEach((id) => ($(id).innerHTML = ""));
+  $("title").textContent = "Searching…";
+  [0, 1, 2].forEach((i) => { $(`c${i}`).className = "clip"; $(`c${i}`).textContent = `clip ${i + 1}`; });
   $("final").removeAttribute("src"); $("final").load();
   $("go").disabled = true; clipsDone = 0; started = performance.now();
   ticker = setInterval(() => ($("timer").textContent = at()), 100);
@@ -108,29 +133,30 @@ async function generate() {
 
 function handle(e) {
   switch (e.event) {
-    case "searching": folder = e.folder; step("s-search", "run"); break;
-    case "writing": step("s-search", "ok", `${e.results} results · ${at()}`); step("s-script", "run"); break;
+    case "searching": folder = e.folder; stage("search", "run"); break;
+    case "writing": stage("search", "ok", `${e.results} results · ${at()}`); stage("script", "run"); $("title").textContent = "Writing…"; break;
     case "script":
-      step("s-script", "ok", at()); step("s-clips", "run", "0/3"); step("s-voice", "run");
+      stage("script", "ok", at()); stage("voice", "run"); stage("clips", "run", "0 of 3");
       $("title").textContent = e.title; $("narration").textContent = e.narration;
       e.captions.forEach((c, i) => ($(`c${i}`).textContent = `rendering… “${c}”`));
       $("sources").innerHTML = "Sources: " + e.sources.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(host(u))}</a>`).join(", ");
       break;
     case "clip":
+      $(`c${e.index}`).className = "clip ready";
       $(`c${e.index}`).innerHTML = `<video src="/out/${folder}/${e.file}" muted autoplay loop playsinline></video>`;
-      clipsDone += 1; step("s-clips", clipsDone === 3 ? "ok" : "run", `${clipsDone}/3 · ${at()}`); break;
-    case "narration": step("s-voice", "ok", at()); break;
-    case "stitching": step("s-stitch", "run"); break;
+      clipsDone += 1; stage("clips", clipsDone === 3 ? "ok" : "run", `${clipsDone} of 3 · ${at()}`); break;
+    case "narration": stage("voice", "ok", at()); if (clipsDone < 3) running = "clips"; break;
+    case "stitching": stage("stitch", "run"); break;
     case "done":
-      step("s-stitch", "ok", at());
+      stage("stitch", "ok", at());
       $("final").src = `/out/${e.folder}/${e.video}`;
       $("final").play().catch(() => {});  // if autoplay is blocked, the controls are there
       $("steps").innerHTML = e.steps.map((s) => `<tr><td>${esc(s.name)}<br><code>${esc(s.model)}</code></td>
         <td class="num">${s.seconds} s</td><td class="num">$${s.cost.toFixed(4)}</td></tr>`).join("");
-      $("total").innerHTML = `<tr><td>Total · ${e.seconds} s</td><td></td><td class="num">$${e.cost.toFixed(4)}</td></tr>`;
+      $("total").innerHTML = `<tr><td>Total · ${e.seconds} s · one bill</td><td></td><td class="num">$${e.cost.toFixed(4)}</td></tr>`;
       $("sources").innerHTML += ` · <a href="/out/${e.folder}/script.md" target="_blank">script.md</a>`;
       break;
-    case "error": $("error").textContent = `⚠️ ${e.message}`; break;
+    case "error": $("error").textContent = `⚠️ ${e.message}`; if (running) stage(running, "err", "failed"); $("title").textContent = ""; break;
   }
 }
 </script>
