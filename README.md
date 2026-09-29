@@ -5,6 +5,7 @@ Runnable demos built on [Eden AI](https://www.edenai.co): one API key and one bi
 | Demo | What it shows | Providers | Eden AI endpoints |
 |---|---|---|---|
 | [voice-web-research](voice-web-research/) | Ask a question out loud and get a cited, spoken answer from the live web | Gradium (speech-to-text, text-to-speech), Nebius (LLM), Tavily (search) | `/v3/upload`, `/v3/universal-ai` (+ async), `/v3/chat/completions` |
+| [news-to-video](news-to-video/) | Turns a topic into a narrated 9:16 news clip built from today's web, in about 30 seconds | Tavily (search), Nebius (LLM), Pruna (video), Gradium (voice) | `/v3/universal-ai` (+ async), `/v3/chat/completions` (structured output) |
 | [upstream-watch](upstream-watch/) | A daily GitHub Action where the web tells a repo its dependencies are stale: it opens cited bump PRs, plus issues for breaking changes | Tavily (search), Nebius (LLM) | `/v3/universal-ai`, `/v3/chat/completions` (structured output) |
 
 ## How the cookbook is organized
