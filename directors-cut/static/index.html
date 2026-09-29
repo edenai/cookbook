@@ -6,10 +6,11 @@
 <title>Director's Cut</title>
 <style>
   :root { --bg: #f6f5f1; --panel: #ffffff; --soft: #fbfaf7; --line: #e3e0d8; --text: #1d1c1a; --muted: #6b675f; --ok: #15803d; --err: #b91c1c;
-          --claude: #c2410c; --pixverse: #7c3aed; --screen: #17171c; }
+          --claude: #c2410c; --gemini: #1d4ed8; --pixverse: #7c3aed; --screen: #17171c; }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.5 system-ui, sans-serif; }
   .wrap { max-width: 1440px; margin: auto; padding: 26px 32px; }
+  @media (max-width: 600px) { .wrap { padding: 18px 16px; } h1 { font-size: 34px; } #go { margin-left: 0; } }
   .eyebrow { color: var(--muted); font-size: 14px; letter-spacing: .12em; text-transform: uppercase; }
   h1 { margin: 2px 0 0; font-size: 44px; } .sub { color: var(--muted); margin: 4px 0 14px; }
   .chips { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -24,12 +25,13 @@
   .examples button { font-size: 14px; padding: 4px 10px; color: var(--muted); cursor: pointer; background: var(--panel); }
   .examples button:hover { color: var(--text); border-color: var(--muted); }
   .controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
-  .controls label { display: flex; flex-direction: column; font-size: 13px; color: var(--muted); gap: 3px; }
+  .controls label { display: flex; flex-direction: column; font-size: 13px; color: var(--muted); gap: 3px; max-width: 100%; }
+  .controls select { max-width: 100%; }
   #go { background: var(--pixverse); color: #fff; border: 0; font-weight: 700; padding: 10px 22px; cursor: pointer; margin-left: auto; }
   button:disabled { opacity: .5; cursor: wait; }
   #timer { font: 600 26px ui-monospace, monospace; min-width: 96px; text-align: right; }
   #error { color: var(--err); margin: 10px 0 0; min-height: 1em; }
-  .pipeline { list-style: none; padding: 0; margin: 16px 0 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .pipeline { list-style: none; padding: 0; margin: 16px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
   .pipeline li { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--c); border-radius: 10px; padding: 10px 12px; opacity: .55; }
   .pipeline li b { display: block; } .pipeline li span { color: var(--c); font-size: 15px; font-weight: 600; } .pipeline li small { display: block; color: var(--muted); font-size: 14px; min-height: 20px; }
   .pipeline li.run { opacity: 1; animation: glow 1.2s infinite; } .pipeline li.ok { opacity: 1; } .pipeline li.err { opacity: 1; border-top-color: var(--err); }
@@ -37,18 +39,26 @@
   .grid { display: grid; grid-template-columns: 1fr 480px; gap: 26px; margin-top: 20px; align-items: start; }
   @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } }
   #title { font-size: 30px; font-weight: 800; } #logline { color: var(--muted); }
-  details { margin: 8px 0 4px; color: var(--muted); font-size: 15px; } summary { cursor: pointer; }
+  details { margin: 8px 0 4px; color: var(--muted); font-size: 15px; } summary { cursor: pointer; } details p { margin: 6px 0; }
+  .cast { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
+  .cast figure { margin: 0; display: flex; gap: 10px; align-items: center; background: var(--soft); border: 1px solid var(--line);
+                 border-radius: 12px; padding: 6px 12px 6px 6px; max-width: 460px; font-size: 14px; }
+  .cast img, .cast .blank { width: 76px; height: 76px; border-radius: 8px; object-fit: cover; background: var(--line); flex: none; }
+  .cast figcaption b { display: block; color: var(--text); } .cast figcaption { color: var(--muted); }
   .board { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; margin-top: 14px; }
   .card { background: var(--soft); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
-  .card .frame { aspect-ratio: var(--ar, 16 / 9); background: var(--screen); display: flex; align-items: center; justify-content: center;
-                 color: #c9c6be; font-size: 14px; text-align: center; padding: 8px; }
-  .card .frame.rolling { animation: roll 1.2s infinite; color: #d8c8ff; }
-  @keyframes roll { 50% { background: #2a2536; } }
-  .card video { width: 100%; height: 100%; object-fit: cover; }
+  .card .frame { aspect-ratio: var(--ar, 16 / 9); background: var(--screen) center / cover no-repeat; display: flex; align-items: center;
+                 justify-content: center; color: #c9c6be; font-size: 14px; text-align: center; position: relative; }
+  .card .frame span { background: rgba(0,0,0,.55); border-radius: 999px; padding: 3px 10px; }
+  .card .frame.rolling span { animation: roll 1.2s infinite; color: #e4d9ff; }
+  @keyframes roll { 50% { background: rgba(124,58,237,.75); } }
+  .card video { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
   .card .body { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
   .card h3 { margin: 0; font-size: 15px; } .card h3 small { color: var(--muted); font-weight: 400; }
-  .card textarea { font-size: 14px; min-height: 84px; padding: 6px 8px; background: var(--panel); }
+  .card label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; display: flex; flex-direction: column; gap: 2px; }
+  .card textarea { font-size: 14px; min-height: 76px; padding: 6px 8px; background: var(--panel); text-transform: none; letter-spacing: 0; color: var(--text); }
   .card .sound { color: var(--muted); }
+  .card .note { color: var(--claude); font-size: 13px; }
   .card button { font-size: 14px; padding: 5px 10px; cursor: pointer; align-self: flex-start; background: var(--panel); }
   .card button:not(:disabled):hover { border-color: var(--pixverse); color: var(--pixverse); }
   #final { width: 100%; aspect-ratio: var(--ar, 16 / 9); background: var(--screen); border-radius: 12px; }
@@ -64,10 +74,11 @@
   <header>
     <div class="eyebrow">Eden AI Cookbook</div>
     <h1>Director's Cut</h1>
-    <div class="sub">Describe a film. An LLM director writes and cuts the shot list, PixVerse shoots every shot with its own sound, and you get the edit.</div>
+    <div class="sub">Describe a film. An LLM director writes it, Gemini draws the storyboard, the director checks every frame, and PixVerse animates each one with its own sound.</div>
     <div class="chips">
       <span class="chip" style="--c: var(--claude)"><b>Director</b> Claude, GPT-6, Kimi K3, GLM 5.3 or DeepSeek V4</span>
-      <span class="chip" style="--c: var(--pixverse)"><b>PixVerse</b> camera: native audio, multi-shot, image-to-video</span>
+      <span class="chip" style="--c: var(--gemini)"><b>Storyboard</b> Gemini: cast sheets, then every first frame</span>
+      <span class="chip" style="--c: var(--pixverse)"><b>PixVerse</b> camera: image-to-video, native audio, multi-shot</span>
       <span class="chip"><b>Eden AI</b> one key for all of them</span>
     </div>
   </header>
@@ -81,9 +92,8 @@
       <label>Aspect <select id="aspect"></select></label>
       <label>Shots <select id="shots"><option>3</option><option selected>4</option><option>5</option></select></label>
       <label>Shooting <select id="mode">
-        <option value="shots">Every shot at once (fastest)</option>
-        <option value="chain">Continuity: each shot starts from the last frame</option>
-        <option value="multishot">One multi-shot take: PixVerse cuts it</option>
+        <option value="storyboard">Storyboard: draw, check, then animate every shot</option>
+        <option value="multishot">One multi-shot take from the first frame: PixVerse cuts it</option>
       </select></label>
       <button id="go">Action!</button>
       <div id="timer">0.0 s</div>
@@ -93,6 +103,8 @@
 
   <ol class="pipeline">
     <li id="p-direct" style="--c: var(--claude)"><b>Direct</b><span id="who-direct">Claude</span><small></small></li>
+    <li id="p-draw" style="--c: var(--gemini)"><b>Draw</b><span>Gemini</span><small></small></li>
+    <li id="p-review" style="--c: var(--claude)"><b>Review</b><span id="who-review">the director</span><small></small></li>
     <li id="p-shoot" style="--c: var(--pixverse)"><b>Shoot</b><span id="who-shoot">PixVerse</span><small></small></li>
     <li id="p-edit" style="--c: var(--muted)"><b>Edit</b><span>ffmpeg</span><small></small></li>
   </ol>
@@ -101,7 +113,8 @@
     <section class="panel">
       <div id="title">Your film appears here</div>
       <div id="logline"></div>
-      <details id="bible" hidden><summary>Style bible (prepended to every shot)</summary><p id="style"></p></details>
+      <div class="cast" id="cast"></div>
+      <details id="bible" hidden><summary>World and style (pasted into every frame, word for word)</summary><p id="world"></p><p id="style"></p></details>
       <div class="board" id="board"></div>
     </section>
     <aside class="panel">
@@ -110,7 +123,7 @@
     </aside>
   </div>
 
-  <footer>The director and PixVerse (the camera) both run through <a href="https://www.edenai.co" target="_blank" rel="noopener">Eden AI</a>
+  <footer>The director, Gemini (the storyboard) and PixVerse (the camera) all run through <a href="https://www.edenai.co" target="_blank" rel="noopener">Eden AI</a>
     with one API key: every call's time and cost is in the table, on one bill. Films are labelled AI-generated.
     Part of the <a href="https://github.com/edenai/cookbook" target="_blank" rel="noopener">Eden AI Cookbook</a>.</footer>
 </div>
@@ -138,16 +151,22 @@ fetch("/api/options").then((r) => r.json()).then((o) => {
   $("model").onchange = () => {  // C1 has no multi-shot takes
     const multi = o.multishot.includes($("model").value);
     $("mode").querySelector('[value="multishot"]').disabled = !multi;
-    if (!multi && $("mode").value === "multishot") $("mode").value = "shots";
+    if (!multi && $("mode").value === "multishot") $("mode").value = "storyboard";
   };
 });
 
 const at = () => `${((performance.now() - started) / 1000).toFixed(1)} s`;
+const file = (name) => `/out/${film.folder}/${name}?v=${Date.now()}`;  // ?v= so a redrawn frame or reshot shot reloads
+const label = (id) => (options.directors.find((d) => d.id === id)?.label || id).split(" (")[0];
 function stage(name, state, note = "") {
   $(`p-${name}`).className = state; $(`p-${name}`).querySelector("small").textContent = note;
   if (state === "run") running = name;
 }
 function setAspect(a) { document.documentElement.style.setProperty("--ar", a.replace(":", " / ")); }
+function screen(i, text, rolling = false) {  // the label over a card's frame
+  $(`frame${i}`).classList.toggle("rolling", rolling);
+  $(`frame${i}`).querySelector("span").textContent = text; $(`frame${i}`).querySelector("span").hidden = !text;
+}
 
 async function stream(url, form, handle) {  // one JSON event per line; fetch, not EventSource, so nothing auto-restarts a paid run
   busy = true; $("go").disabled = true; document.querySelectorAll(".card button").forEach((b) => (b.disabled = true));
@@ -173,65 +192,100 @@ async function stream(url, form, handle) {  // one JSON event per line; fetch, n
 function startFilm() {
   const form = new FormData();
   for (const id of ["premise", "model", "director", "aspect", "shots", "mode"]) form.append(id, $(id).value);
-  film = { mode: $("mode").value, shots: [] }; allSteps = []; shotsDone = 0;
+  film = { mode: $("mode").value, shots: [], reshooting: false }; allSteps = [];
   setAspect($("aspect").value);
-  ["direct", "shoot", "edit"].forEach((s) => stage(s, ""));
-  $("who-direct").textContent = $("director").selectedOptions[0].text;
+  ["direct", "draw", "review", "shoot", "edit"].forEach((s) => stage(s, ""));
+  $("who-direct").textContent = $("director").selectedOptions[0].text.split(" (")[0];
+  $("who-review").textContent = "the director";
   $("who-shoot").textContent = $("model").selectedOptions[0].text;
-  $("title").textContent = "Claude is writing the film…"; $("logline").textContent = ""; $("bible").hidden = true; $("board").innerHTML = "";
+  $("title").textContent = `${$("who-direct").textContent} is writing the film…`; $("logline").textContent = "";
+  $("bible").hidden = true; $("board").innerHTML = ""; $("cast").innerHTML = "";
   $("final").removeAttribute("src"); $("final").load(); showSteps();
   stream("/api/film", form, handle);
 }
 
 function reshoot(i) {
-  const form = new FormData();
-  form.append("folder", film.folder); form.append("index", i); form.append("action", $(`action${i}`).value);
-  ["shoot", "edit"].forEach((s) => stage(s, ""));
+  const form = new FormData(), redraw = $(`frametext${i}`).value.trim() !== film.shots[i].frame;
+  form.append("folder", film.folder); form.append("index", i);
+  form.append("frame", $(`frametext${i}`).value); form.append("action", $(`action${i}`).value);
+  film.shots[i].frame = $(`frametext${i}`).value.trim(); film.reshooting = true;
+  stage("draw", redraw ? "run" : "", redraw ? `redrawing frame ${i + 1}` : ""); stage("review", ""); stage("shoot", ""); stage("edit", "");
+  if (redraw) screen(i, "redrawing…", true);
   stream("/api/reshoot", form, handle);
 }
 
-let shotsDone = 0;
 function card(i, s) {
-  return `<div class="card"><div class="frame" id="frame${i}">shot ${i + 1}</div><div class="body">
-    <h3>${i + 1}. ${esc(s.name)} <small>· ${s.seconds} s</small></h3>
-    <textarea id="action${i}" aria-label="Direction for shot ${i + 1}">${esc(s.action)}</textarea>
+  const take = film.mode === "multishot";
+  return `<div class="card"><div class="frame" id="frame${i}"><span>${take && i ? "in the take" : "waiting for the storyboard"}</span></div><div class="body">
+    <h3>${i + 1}. ${esc(s.name)} <small>· ${s.seconds} s · ${esc(s.camera)}</small></h3>
+    <label>First frame<textarea id="frametext${i}" aria-label="First frame of shot ${i + 1}">${esc(s.frame)}</textarea></label>
+    <label>Action<textarea id="action${i}" aria-label="Action for shot ${i + 1}">${esc(s.action)}</textarea></label>
     <div class="sound">🔊 ${esc(s.sound)}</div>
-    ${film.mode === "multishot" ? "" : `<button type="button" onclick="reshoot(${i})" disabled>Reshoot this shot</button>`}</div></div>`;
+    <div class="note" id="note${i}"></div>
+    ${take ? "" : `<button type="button" onclick="reshoot(${i})" disabled>Reshoot this shot</button>`}</div></div>`;
 }
 
 function handle(e) {
   switch (e.event) {
     case "directing": film.folder = e.folder; stage("direct", "run"); break;
+    case "step": allSteps.push(e); showSteps(); break;
     case "plan":
-      film.shots = e.shots;
-      stage("direct", "ok", at()); stage("shoot", "run", `0 of ${e.shots.length}`);
+      film.shots = e.shots; film.cast = e.cast; film.frames = 0;
+      stage("direct", "ok", at());
       $("title").textContent = e.title; $("logline").textContent = e.logline;
-      $("style").textContent = e.style; $("bible").hidden = false;
+      $("world").textContent = e.world; $("style").textContent = e.style; $("bible").hidden = false;
+      $("cast").innerHTML = e.cast.map((c, k) => `<figure><div class="blank" id="cast${k}"></div><figcaption><b>${esc(c.tag)}</b>${esc(c.look)}</figcaption></figure>`).join("");
       $("board").innerHTML = e.shots.map((s, i) => card(i, s)).join("");
       break;
+    case "drawing": stage("draw", "run", film.cast.length ? "cast sheets" : "first frames"); break;
+    case "cast": $(`cast${e.index}`).outerHTML = `<img id="cast${e.index}" src="${file(e.file)}" alt="${esc(film.cast[e.index].tag)}">`; break;
+    case "frame":
+      $(`frame${e.index}`).style.backgroundImage = `url("${file(e.file)}")`;
+      $(`frame${e.index}`).querySelector("video")?.remove();
+      screen(e.index, "");
+      if (film.reshooting) stage("draw", "ok", `frame ${e.index + 1} redrawn · ${at()}`);
+      else if (running === "draw") {  // redraws asked for by the review are counted there
+        film.frames += 1;
+        stage("draw", "run", `${film.frames} of ${film.mode === "multishot" ? 1 : film.shots.length} frames · ${at()}`);
+      }
+      break;
+    case "reviewing":
+      stage("draw", "ok", $("p-draw").querySelector("small").textContent);
+      $("who-review").textContent = label(e.model); stage("review", "run", "looking at every frame"); break;
+    case "review":
+      film.redrawn = e.notes.length ? `${e.notes.length} of ${film.mode === "multishot" ? 1 : film.shots.length} redrawn` : "all frames approved";
+      stage("review", "run", e.notes.length ? `redrawing ${e.notes.length}…` : film.redrawn);
+      for (const n of e.notes) {
+        $(`note${n.index}`).textContent = `✎ Redrawn after review: ${n.problem}`;
+        $(`frametext${n.index}`).value = n.frame; film.shots[n.index].frame = n.frame;
+        screen(n.index, "redrawing…", true);
+      }
+      break;
     case "shooting":
-      if (e.index < 0) { film.shots.forEach((_, i) => { $(`frame${i}`).className = "frame rolling"; $(`frame${i}`).textContent = "rolling… (one take)"; }); break; }
+      if ($("p-draw").className === "run") stage("draw", "ok", $("p-draw").querySelector("small").textContent);
+      if ($("p-review").className === "run") stage("review", "ok", `${film.redrawn} · ${at()}`);
       if ($("p-shoot").className !== "run") stage("shoot", "run");
-      $(`frame${e.index}`).className = "frame rolling"; $(`frame${e.index}`).textContent = "rolling…"; break;
+      if (e.index < 0) film.shots.forEach((_, i) => screen(i, i ? "in the take" : "rolling… (one take)", true));
+      else screen(e.index, "rolling…", true);
+      break;
     case "shot":
-      allSteps.push(e);
       if (e.index < 0) {  // the multi-shot take fills the whole board
-        film.shots.forEach((_, i) => { $(`frame${i}`).className = "frame"; $(`frame${i}`).textContent = "in the take →"; });
+        film.shots.forEach((_, i) => screen(i, "in the take →"));
         stage("shoot", "ok", `one take · ${at()}`);
       } else {
-        $(`frame${e.index}`).className = "frame";
-        $(`frame${e.index}`).innerHTML = `<video src="/out/${film.folder}/${e.file}?v=${Date.now()}" muted autoplay loop playsinline></video>`;
-        shotsDone = document.querySelectorAll(".frame video").length;
-        stage("shoot", shotsDone === film.shots.length ? "ok" : "run", `${shotsDone} of ${film.shots.length} · ${at()}`);
+        $(`frame${e.index}`).querySelector("video")?.remove();
+        $(`frame${e.index}`).insertAdjacentHTML("beforeend", `<video src="${file(e.file)}" muted autoplay loop playsinline></video>`);
+        screen(e.index, "");
+        const shot = document.querySelectorAll(".frame video").length;
+        stage("shoot", shot === film.shots.length ? "ok" : "run", `${shot} of ${film.shots.length} · ${at()}`);
       }
-      showSteps(); break;
+      break;
     case "editing": stage("shoot", "ok", $("p-shoot").querySelector("small").textContent); stage("edit", "run"); break;
     case "done":
       stage("edit", "ok", `${e.length} s film · ${at()}`);
-      allSteps.push(...e.steps.filter((s) => !s.name.startsWith("shot") && !s.name.startsWith("multi")));
-      $("final").src = `/out/${e.folder}/${e.video}?v=${Date.now()}`;
+      $("final").src = file(e.video);
       $("final").play().catch(() => {});  // if autoplay is blocked, the controls are there
-      showSteps(); break;
+      break;
     case "error": $("error").textContent = `⚠️ ${e.message}`; if (running) stage(running, "err", "failed"); break;
   }
 }
