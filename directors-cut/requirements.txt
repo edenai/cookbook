@@ -1,0 +1,5 @@
+httpx
+python-dotenv
+fastapi
+uvicorn
+python-multipart
